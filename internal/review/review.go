@@ -17,7 +17,8 @@ type Scope struct {
 
 type Options struct {
 	Scope
-	OnProgress func(string)
+	OnProgress   func(string)
+	KeepSnapshot bool
 }
 
 // Uncertain is a historical patch that could not be isolated safely. It is
@@ -31,12 +32,22 @@ type Uncertain struct {
 
 type Result struct {
 	Scope
-	Tip       string      `json:"tip"`
-	Commits   int         `json:"commits"`
-	Merges    int         `json:"merges"`
-	Imported  int         `json:"imported"`
-	Patch     string      `json:"patch"`
-	Uncertain []Uncertain `json:"uncertain,omitempty"`
+	Tip          string      `json:"tip"`
+	Commits      int         `json:"commits"`
+	Merges       int         `json:"merges"`
+	Imported     int         `json:"imported"`
+	Patch        string      `json:"patch"`
+	Uncertain    []Uncertain `json:"uncertain,omitempty"`
+	SnapshotPath string      `json:"-"`
+	Baseline     string      `json:"-"`
+}
+
+// Close releases a retained comparison snapshot after its viewer closes.
+func (r Result) Close() error {
+	if r.SnapshotPath == "" {
+		return nil
+	}
+	return os.RemoveAll(filepath.Dir(r.SnapshotPath))
 }
 
 // Analyze constructs a counterfactual tree by reversing the feature's own
@@ -89,7 +100,12 @@ func Analyze(ctx context.Context, options Options) (Result, error) {
 	if err != nil {
 		return result, err
 	}
-	defer os.RemoveAll(temporary)
+	keep := false
+	defer func() {
+		if !keep {
+			_ = os.RemoveAll(temporary)
+		}
+	}()
 	work := gitRepository{path: filepath.Join(temporary, "work")}
 	progress := func(message string) {
 		if options.OnProgress != nil {
@@ -154,6 +170,14 @@ func Analyze(ctx context.Context, options Options) (Result, error) {
 			if patchErr != nil {
 				return result, patchErr
 			}
+			if patch == "" {
+				// A subsequent rename may move the conflicted path away from
+				// its name in this commit. Keep the feature commit available.
+				patch, patchErr = r.run(ctx, "diff", "--no-ext-diff", "--no-color", commit.Parents[0], commit.ID, "--")
+				if patchErr != nil {
+					return result, patchErr
+				}
+			}
 			result.Uncertain = append(result.Uncertain, Uncertain{Commit: commit.ID, Subject: commit.Subject, Reason: "Overlapping changes · historical feature patch", Patch: patch})
 
 			// Retain the current background for ambiguous paths. The original
@@ -182,6 +206,11 @@ func Analyze(ctx context.Context, options Options) (Result, error) {
 		return result, err
 	}
 	result.Patch, err = work.run(ctx, "diff", "--no-ext-diff", "--no-color", "--find-renames", "--unified=12", strings.TrimSpace(baseline), result.Tip, "--")
+	if err == nil && options.KeepSnapshot {
+		keep = true
+		result.SnapshotPath = work.path
+		result.Baseline = strings.TrimSpace(baseline)
+	}
 	return result, err
 }
 
