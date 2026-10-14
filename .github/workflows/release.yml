@@ -1,0 +1,140 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sift-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Check tag version
+        run: |
+          python -m unittest discover -s scripts -p 'test_*.py'
+          python scripts/release_assets.py check-tag "$GITHUB_REF_NAME"
+      - name: Generate release notes with changelogithub
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/release_assets.py prepare "$GITHUB_REF_NAME"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-notes
+          path: .release/*.md
+          include-hidden-files: true
+          if-no-files-found: error
+
+  package:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            platform: darwin/universal
+            target: darwin-universal
+          - os: ubuntu-24.04
+            platform: windows/amd64
+            target: windows-amd64
+          - os: ubuntu-24.04
+            platform: linux/amd64
+            target: linux-amd64
+    runs-on: ${{ matrix.os }}
+    env:
+      CGO_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-notes
+          path: .release
+      - name: Share release notes with the app updater
+        run: cp .release/CHANGELOG.md CHANGELOG.md
+      - name: Install NSIS for the Windows installer
+        if: matrix.target == 'windows-amd64'
+        run: sudo apt-get update && sudo apt-get install -y nsis
+      - name: Build installers and signed update packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+        run: |
+          test -n "$MYGO_UPDATER_PRIVATE_KEY"
+          go vet ./...
+          go tool mygo vet .
+          go test ./...
+          go tool mygo build -platform "${{ matrix.platform }}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sift-${{ matrix.target }}
+          path: |
+            build/${{ matrix.target }}/*.dmg
+            build/${{ matrix.target }}/*Setup*.exe
+            build/${{ matrix.target }}/*.deb
+            build/${{ matrix.target }}/*.tar.gz
+            build/${{ matrix.target }}/*.delta
+            build/${{ matrix.target }}/update-*.json
+            build/${{ matrix.target }}/install.sh
+          if-no-files-found: error
+
+  publish:
+    needs: package
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-notes
+          path: .release
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: sift-*
+          path: .release/assets
+          merge-multiple: true
+      - name: Verify installers, updates and release notes
+        run: |
+          python scripts/release_assets.py verify .release/assets
+          cd .release/assets
+          sha256sum -c SHA256SUMS
+      - name: Create draft release
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft > .release/is-draft; then
+            test "$(cat .release/is-draft)" = true
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --draft \
+              --title "$GITHUB_REF_NAME" --notes-file .release/release-notes.md
+          fi
+          gh release edit "$GITHUB_REF_NAME" --notes-file .release/release-notes.md
+      - name: Upload all release files
+        run: gh release upload "$GITHUB_REF_NAME" .release/assets/* --clobber
+      - name: Verify uploaded downloads
+        run: |
+          gh release download "$GITHUB_REF_NAME" --dir .release/downloaded
+          cd .release/downloaded
+          sha256sum -c SHA256SUMS
+      - name: Publish completed release
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false --latest

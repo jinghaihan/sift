@@ -1,0 +1,41 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-2025, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    env:
+      CGO_ENABLED: '0'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Check Go formatting
+        run: test -z "$(gofmt -l cmd internal tools)"
+      - run: go vet ./...
+      - run: go tool mygo vet .
+      - run: go test ./...
+      - name: Test release scripts
+        run: python -m unittest discover -s scripts -p 'test_*.py'
+      - name: Build native app
+        run: go tool mygo build -skip-dmg

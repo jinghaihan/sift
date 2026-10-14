@@ -68,6 +68,12 @@ go tool mygo build
 
 The macOS app is written to `build/darwin-arm64/Sift.app` on Apple Silicon.
 
+## Updates
+
+Packaged apps check GitHub Releases for signed updates and show release notes in a native window. Use **Sift → Check for Updates…** to check manually. Development builds do not check automatically. Updates are downloaded only after you choose to install, unless you enable automatic installation in the update window.
+
+See [Releasing Sift](docs/releasing.md) for version upgrades, tag builds and GitHub Release publication.
+
 ## Credits
 
 - [Godiff](https://github.com/egoist/godiff) by [EGOIST](https://github.com/egoist): native review interface, diff rendering, file navigation and inline comments.
