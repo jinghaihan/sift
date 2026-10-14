@@ -17,6 +17,7 @@ import (
 )
 
 func (w *window) loadFeature() {
+	w.featureHistoryOpen = false
 	w.saveFeatureReview()
 	pendingDB, pendingRecord := w.featureDB, w.featureRecord.Clone()
 	if w.featureCancel != nil {
@@ -342,29 +343,6 @@ func (w *window) featureDialogs(c *ui.Context) {
 			})
 		})
 	}
-	if w.featureHistoryOpen && w.featureResult != nil {
-		ui.DialogBase(c, &w.featureHistoryOpen, func(backdrop, panel ui.Element) {
-			panel.Width(700).MaxHeight(560).Padding(18).Gap(6).Background(paletteFor(c.Theme()).headerBg).Radius(12).Border(1, c.Theme().Border)
-			ui.Row(c).Gap(10).Children(func() {
-				ui.Text(c, "Historical changes").FontSize(18).Bold().Grow(1)
-				iconButton(c, iconClose, "Close").OnClick(func() { w.featureHistoryOpen = false })
-			})
-			ui.Text(c, "These conflict patches are historical comparisons, separate from the net feature diff.").FillWidth().TextColor(c.Theme().TextMuted)
-			ui.Scroll(c).MaxHeight(420).FillWidth().Children(func() {
-				ui.Column(c).Gap(4).FillWidth().Children(func() {
-					for _, item := range w.featureResult.Uncertain {
-						c.Key(item.Commit)
-						ui.ButtonBase(c).Padding(8).FillWidth().Label(item.Commit[:9]).OnClick(func() { w.featureHistoryOpen = false; w.setSource(source{kind: sourceHistorical, ref: item.Commit}) }).Children(func() {
-							ui.Column(c).Gap(4).FillWidth().Children(func() {
-								ui.Text(c, item.Commit[:9]+" · "+item.Subject).FontSize(12).SingleLine()
-								ui.Text(c, item.Reason).FontSize(11).TextColor(c.Theme().Warning)
-							})
-						})
-					}
-				})
-			})
-		})
-	}
 }
 
 func (w *window) featureToolbar(c *ui.Context, pal *palette) {
@@ -383,10 +361,7 @@ func (w *window) featureToolbar(c *ui.Context, pal *palette) {
 			ui.Text(c, filepath.Base(w.repo.Root)).FontSize(13).FontWeight(600).SingleLine()
 			ui.Icon(c, iconChevronDown).FontSize(12).TextColor(t.TextMuted)
 		})
-		ui.Select(c, &w.featureBranch, w.featureBranches).Label("Feature branch").MaxWidth(280).Disabled(w.loading).OnChange(func() {
-			w.featureScope = review.Scope{}
-			w.setSource(source{kind: sourceFeature, ref: w.featureBranch})
-		})
+		w.featureBranchPicker(c, pal)
 		if w.source.kind == sourceHistorical {
 			iconButton(c, iconHouse, "Back to feature review").OnClick(func() { w.setSource(source{kind: sourceFeature, ref: w.featureBranch}) })
 			ui.Text(c, "Historical").FontSize(11).TextColor(t.Warning)
@@ -396,7 +371,13 @@ func (w *window) featureToolbar(c *ui.Context, pal *palette) {
 		}
 		ui.Spacer(c)
 		if result := w.featureResult; result != nil && result.Branch == w.featureBranch && len(result.Uncertain) > 0 {
-			iconButton(c, iconAlert, fmt.Sprintf("%d historical conflict patches", len(result.Uncertain))).TextColor(t.Warning).OnClick(func() { w.featureHistoryOpen = true })
+			trigger := iconButton(c, iconAlert, fmt.Sprintf("%d historical conflict patches", len(result.Uncertain))).TextColor(t.Warning).OnClick(func() {
+				if !w.featureHistoryOpen {
+					w.historicalQuery = ""
+				}
+				w.featureHistoryOpen = !w.featureHistoryOpen
+			})
+			w.featureHistoryPopover(c, trigger)
 		}
 		if w.loadErr != nil {
 			iconButton(c, iconBranch, "Set review range").OnClick(func() {
