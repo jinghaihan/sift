@@ -432,6 +432,12 @@ func (w *window) featureToolbar(c *ui.Context, pal *palette) {
 			iconButton(c, iconRefresh, "Refresh feature diff (⌘R)").OnClick(w.refresh)
 		}
 		w.layoutControl(c, pal)
-
+		themeIcon, themeTip, nextTheme := iconMoon, "Switch to dark theme", "dark"
+		if t.Dark {
+			themeIcon, themeTip, nextTheme = iconSun, "Switch to light theme", "light"
+		}
+		iconButton(c, themeIcon, themeTip).OnClick(func() {
+			go cfg.Update(func(settings *Settings) { settings.Theme = nextTheme })
+		})
 	})
 }
