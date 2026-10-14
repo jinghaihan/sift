@@ -3,5 +3,9 @@
   "identifier": "dev.jinghaihan.sift",
   "version": "0.1.0",
   "main": "./cmd/sift",
-  "out": "build"
+  "out": "build",
+  "updates": {
+    "publicKey": "DLkrFw6/RcyWZWWGs4ZPzWdQlOfbre8FZG65Ya20a2Q=",
+    "github": "jinghaihan/sift"
+  }
 }

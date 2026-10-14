@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
+	updaterUI "github.com/egoist/mygo/plugins/updater/native"
 	"github.com/egoist/mygo/ui"
 	"github.com/jinghaihan/sift/internal/git"
 	"github.com/jinghaihan/sift/internal/github"
@@ -247,6 +248,7 @@ func Run() {
 	mygo.App.OnOpenFile(func(path string) {
 		go open(request{dir: path}, true)
 	})
+	mygo.Use(updaterUI.Plugin)
 	state.open() // before the menu, which lists the recent repositories
 	applyTheme(cfg.Get())
 	mygo.App.SetMenu(buildMenu())
