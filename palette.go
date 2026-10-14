@@ -3,8 +3,8 @@ package main
 import (
 	"strings"
 
-	"github.com/egoist/godiff/internal/agent"
-	"github.com/egoist/godiff/internal/github"
+	"github.com/jinghaihan/sift/internal/agent"
+	"github.com/jinghaihan/sift/internal/github"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 )

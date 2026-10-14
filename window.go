@@ -14,10 +14,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/egoist/godiff/internal/diff"
-	"github.com/egoist/godiff/internal/git"
-	"github.com/egoist/godiff/internal/github"
-	"github.com/egoist/godiff/internal/highlight"
+	"github.com/jinghaihan/sift/internal/diff"
+	"github.com/jinghaihan/sift/internal/git"
+	"github.com/jinghaihan/sift/internal/github"
+	"github.com/jinghaihan/sift/internal/highlight"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 )

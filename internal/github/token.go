@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/egoist/godiff/internal/proc"
-	"github.com/egoist/godiff/internal/shellenv"
+	"github.com/jinghaihan/sift/internal/proc"
+	"github.com/jinghaihan/sift/internal/shellenv"
 )
 
 // FindToken returns a token for github.com from the environment, else from

@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/egoist/godiff/internal/diff"
-	"github.com/egoist/godiff/internal/proc"
+	"github.com/jinghaihan/sift/internal/diff"
+	"github.com/jinghaihan/sift/internal/proc"
 )
 
 // EmptyTree is the hash of git's empty tree, the base of a repository

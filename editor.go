@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/egoist/godiff/internal/proc"
+	"github.com/jinghaihan/sift/internal/proc"
 	"github.com/egoist/mygo"
 )
 

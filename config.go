@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/egoist/godiff/internal/agent"
+	"github.com/jinghaihan/sift/internal/agent"
 	"github.com/egoist/mygo"
 )
 

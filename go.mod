@@ -1,6 +1,6 @@
-module github.com/egoist/godiff
+module github.com/jinghaihan/sift
 
-go 1.27.1
+go 1.27.2
 
 tool github.com/egoist/mygo/cmd/mygo
 

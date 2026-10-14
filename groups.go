@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/egoist/godiff/internal/agent"
-	"github.com/egoist/godiff/internal/diff"
-	"github.com/egoist/godiff/internal/git"
+	"github.com/jinghaihan/sift/internal/agent"
+	"github.com/jinghaihan/sift/internal/diff"
+	"github.com/jinghaihan/sift/internal/git"
 	"github.com/egoist/mygo/ui"
 )
 

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/egoist/godiff/internal/git"
+	"github.com/jinghaihan/sift/internal/git"
 	"github.com/egoist/mygo/ui"
 )
 

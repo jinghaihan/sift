@@ -3,7 +3,7 @@ package main
 import (
 	"strings"
 
-	"github.com/egoist/godiff/internal/diff"
+	"github.com/jinghaihan/sift/internal/diff"
 	"github.com/egoist/mygo/ui"
 )
 

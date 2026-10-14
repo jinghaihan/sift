@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/egoist/godiff/internal/diff"
+	"github.com/jinghaihan/sift/internal/diff"
 )
 
 // SortFiles sorts files as a file tree lists them: at each level,

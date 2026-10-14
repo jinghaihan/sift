@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/egoist/godiff/internal/github"
+	"github.com/jinghaihan/sift/internal/github"
 	"github.com/egoist/mygo/ui"
 )
 
