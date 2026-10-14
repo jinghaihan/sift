@@ -128,6 +128,7 @@ func (w *window) reviewCommentsPane(c *ui.Context, pal *palette) {
 			ui.Text(c, fmt.Sprint(len(list))).FontSize(11).TextColor(t.TextMuted).Grow(1)
 			iconButton(c, iconArrowUp, "Previous comment").Disabled(at <= 0).OnClick(func() { w.stepReviewComment(-1) })
 			iconButton(c, iconArrowDown, "Next comment").Disabled(len(list) == 0 || at == len(list)-1).OnClick(func() { w.stepReviewComment(1) })
+			iconButton(c, iconTrash, "Clear all comments").Disabled(len(w.comments) == 0).OnClick(func() { w.clearReviewCommentsOpen = true })
 			iconButton(c, iconClose, "Close comments").OnClick(func() { w.reviewCommentsOpen = false })
 		})
 		if len(list) == 0 {
@@ -172,4 +173,18 @@ func (w *window) reviewCommentsPane(c *ui.Context, pal *palette) {
 			})
 		}
 	})
+}
+
+func (w *window) clearReviewCommentsDialog(c *ui.Context) {
+	if !w.clearReviewCommentsOpen {
+		return
+	}
+	if choice := ui.AlertDialog(c, &w.clearReviewCommentsOpen, "Clear all comments?", "All comments in this review, including those with changed locations, will be deleted. Other reviews and viewed files will be kept.", "Cancel", "Clear all"); choice == 1 {
+		w.clearReviewCommentsOpen = false
+		w.comments, w.discarding = nil, nil
+		w.reviewCommentID = ""
+		w.reviewCommentList = ui.ListState{}
+		w.rowsDirty = true
+		w.saveFeatureReview()
+	}
 }

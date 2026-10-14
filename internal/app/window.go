@@ -76,6 +76,7 @@ type window struct {
 	featureRangeStart, featureRangeIntegration              string
 	featureClosing, featureCloseReady, featureQuitRequested bool
 	reviewCommentsOpen                                      bool
+	clearReviewCommentsOpen                                 bool
 	reviewCommentID                                         string
 	reviewCommentList                                       ui.ListState
 	win                                                     *mygo.Window

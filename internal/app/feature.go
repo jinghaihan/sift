@@ -18,6 +18,7 @@ import (
 
 func (w *window) loadFeature() {
 	w.featureHistoryOpen = false
+	w.clearReviewCommentsOpen = false
 	w.saveFeatureReview()
 	pendingDB, pendingRecord := w.featureDB, w.featureRecord.Clone()
 	if w.featureCancel != nil {

@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -127,4 +128,58 @@ func TestFeatureRefreshWaitsForLatestCommentSave(t *testing.T) {
 		job()
 	}
 	w.hold = false
+}
+
+func TestClearAllReviewCommentsRequiresConfirmationAndPersists(t *testing.T) {
+	w, tt := newFeatureReview(t)
+	w.addComment("main.go", sideNew, 6, 6)
+	w.comments[0].text = "A prepared review note."
+	w.saveFeatureReview()
+	w.featureRecord.Comments = append(w.featureRecord.Comments, reviewstore.NewComment("removed.go", "removed.go", "Keep this outdated note until cleared.", reviewstore.Anchor{Side: 1, Start: 3, End: 3, Excerpt: "oldCall()"}))
+	w.comments = nil
+	w.restoreFeatureComments()
+	w.setViewed(w.files[0], true)
+	w.saveFeatureReview()
+	otherScope := w.featureRecord.Scope
+	otherScope.Branch = "another-feature"
+	otherDB, otherRecord, err := reviewstore.Open(filepath.Dir(cfg.path), otherScope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherRecord.Comments = append(otherRecord.Comments, w.featureRecord.Comments[0])
+	if err := otherDB.Save(otherRecord); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if err := tt.Click("Review comments (2)"); err != nil {
+		t.Fatal(err)
+	}
+	if err := tt.Click("Clear all comments"); err != nil {
+		t.Fatal(err)
+	}
+	if !w.clearReviewCommentsOpen || len(w.comments) != 2 {
+		t.Fatal("opening the confirmation deleted comments")
+	}
+	snapshot(t, tt, "clear-review-comments")
+	if err := tt.Click("Cancel"); err != nil {
+		t.Fatal(err)
+	}
+	if len(w.comments) != 2 || w.clearReviewCommentsOpen {
+		t.Fatal("canceling cleared comments")
+	}
+	tt.Click("Clear all comments")
+	if err := tt.Click("Clear all"); err != nil {
+		t.Fatal(err)
+	}
+	_, saved, err := reviewstore.Open(filepath.Dir(cfg.path), w.featureRecord.Scope)
+	if err != nil || len(saved.Comments) != 0 || len(w.comments) != 0 || !w.isViewed(w.files[0]) || len(saved.Viewed) == 0 {
+		t.Fatalf("clear did not persist comments only: %+v, %v", saved, err)
+	}
+	_, other, err := reviewstore.Open(filepath.Dir(cfg.path), otherScope)
+	if err != nil || len(other.Comments) != 1 {
+		t.Fatal("clearing this review changed another branch's review")
+	}
+	if rect, ok := tt.Find("Changes"); !ok || rect.H < 600 {
+		t.Fatal("clearing comments hid the diff")
+	}
 }

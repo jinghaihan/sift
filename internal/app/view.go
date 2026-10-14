@@ -70,6 +70,7 @@ func (w *window) view(c *ui.Context) {
 	w.reviewDialog(c)
 	w.featureDialogs(c)
 	w.reviewFileDialogs(c)
+	w.clearReviewCommentsDialog(c)
 	if w.discarding != nil {
 		open := true
 		if choice := ui.AlertDialog(c, &open, "Discard this review comment?", "Its text will be lost.", "Cancel", "Discard"); choice == 1 {
@@ -398,7 +399,7 @@ func thinking(c *ui.Context, status string) {
 
 // shortcuts handles the window's keys that the menus do not.
 func (w *window) shortcuts(c *ui.Context, reviewBuilt bool) {
-	if w.reviewImport != nil || w.reviewFileError != "" {
+	if w.reviewImport != nil || w.reviewFileError != "" || w.clearReviewCommentsOpen {
 		w.typing = false
 		return
 	}
