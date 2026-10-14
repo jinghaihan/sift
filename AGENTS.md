@@ -41,9 +41,11 @@ add a web frontend without a demonstrated native limitation.
   compact metrics: 13-point code, 20-point line height.
 - Keep repository/branch selection in the header. Use icon buttons with
   tooltips for layout, wrap, comments, export and refresh. No sidebar Scope action.
-- Sift's MIT license covers original contributions only. Godiff currently has
-  no repository license; do not publish or redistribute this imported prototype
-  without resolving upstream permission.
+- Preserve Godiff's original commits unchanged. Sift is maintained as a
+  standalone repository with its own changes committed after the upstream history.
+- Sift's MIT license covers original contributions only. Godiff's author has
+  permitted modifications, but no repository license has been declared for its
+  code; do not present it as covered by Sift's MIT license.
 - Keep packages small and separate stages with blank lines.
 - Prefer the installed Git executable and Go's standard library.
 - Keep I/O and Git operations off the UI thread. Publish changes through
@@ -59,5 +61,5 @@ Run `gofmt`, `go vet ./...`, `go tool mygo vet .`, and
 repeated merges, same-file upstream changes, reversals, conflicts, and dirty
 source repositories. Inspect the native app for layout changes.
 
-Make atomic English Conventional Commits. Do not push or create a GitHub
-repository until the user accepts this first version.
+Make atomic English Conventional Commits on `main`. The `origin` remote points
+to `https://github.com/jinghaihan/sift`; do not add a Godiff remote unless requested.
