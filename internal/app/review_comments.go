@@ -83,6 +83,7 @@ func (w *window) revealComment(cm *comment) {
 		return
 	}
 	w.filter, w.finding = "", false
+	w.buildTree()
 	f := w.files[fi]
 	f.collapsed = false
 	// Reveal just enough unchanged context for the comment, rather than

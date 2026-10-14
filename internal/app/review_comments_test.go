@@ -68,6 +68,9 @@ func TestReviewCommentsNavigateHiddenContext(t *testing.T) {
 	if !slices.ContainsFunc(w.rows, func(r row) bool { return r.kind == rowComment && r.comment == first }) || !tt.HasText("line 20") {
 		t.Fatal("hidden unchanged context was not revealed")
 	}
+	if tt.HasText("No changed files") {
+		t.Fatal("comment navigation left the file tree filtered out")
+	}
 	snapshot(t, tt, "review-comments")
 	if err := tt.Click("Next comment"); err != nil {
 		t.Fatal(err)
