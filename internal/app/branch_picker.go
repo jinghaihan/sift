@@ -20,9 +20,9 @@ func (w *window) featureBranchPicker(c *ui.Context, pal *palette) {
 		w.typing = true
 	}
 	parts.Popup(func(panel ui.Element) {
-		panel.Width(280).Padding(4).Radius(8).Background(pal.headerBg).Border(1, t.Border).Shadow(0, 4, 12, 0, ui.RGBA(0, 0, 0, 0.15))
-		ui.Scroll(c).MaxHeight(280).FillWidth().Children(func() {
-			ui.Column(c).FillWidth().Children(func() {
+		panel.Width(280).Radius(8).Background(pal.headerBg).Border(1, t.Border).Shadow(0, 4, 12, 0, ui.RGBA(0, 0, 0, 0.15))
+		ui.Scroll(c).MaxHeight(288).FillWidth().Children(func() {
+			ui.Column(c).FillWidth().Padding(4).Children(func() {
 				query := strings.ToLower(strings.TrimSpace(w.branchQuery))
 				count := 0
 				for _, branch := range w.featureBranches {
