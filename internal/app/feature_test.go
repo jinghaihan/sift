@@ -10,6 +10,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/jinghaihan/sift/internal/git"
 	"github.com/jinghaihan/sift/internal/review"
+	reviewstore "github.com/jinghaihan/sift/internal/store"
 )
 
 func TestFeatureSidebarCanReopen(t *testing.T) {
@@ -41,6 +42,43 @@ func TestFeatureSidebarCanReopen(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestProjectSwitchAndNewCommitsRestoreSavedRangeAndComments(t *testing.T) {
+	w, _ := newFeatureReview(t)
+	// An equivalent ref spelling makes a restored scope distinguishable from
+	// a newly inferred one, which would select "main".
+	w.featureScope.Integration = "main~0"
+	w.load()
+	if w.loadErr != nil {
+		t.Fatal(w.loadErr)
+	}
+	w.addComment("main.go", sideNew, 6, 6)
+	w.comments[0].text = "Restore this project's prepared review note."
+	w.saveFeatureReview()
+	wantScope, wantID := w.featureScope, w.comments[0].storeID
+	other, _ := newFeatureReview(t)
+	// Reproduce the old global session pointing at a different project.
+	if err := reviewstore.SaveScope(filepath.Dir(cfg.path), other.featureScope); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, w.repo.Root, "later.txt", "A later feature commit.\n")
+	gitIn(t, w.repo.Root, "add", "later.txt")
+	gitIn(t, w.repo.Root, "commit", "-qm", "later feature work")
+	reopened := newWindow(w.repo, source{kind: sourceFeature, ref: "feature"})
+	reopened.load()
+	if reopened.featureResult != nil {
+		defer reopened.featureResult.Close()
+	}
+	if reopened.loadErr != nil || reopened.featureScope != wantScope {
+		t.Fatalf("returning to the project recomputed its range: %+v, %v", reopened.featureScope, reopened.loadErr)
+	}
+	if len(reopened.comments) != 1 || reopened.comments[0].storeID != wantID {
+		t.Fatal("the original review's comment did not return")
+	}
+	if len(reopened.files) != 3 {
+		t.Fatal("restoring the saved range omitted the later feature commit")
 	}
 }
 

@@ -239,9 +239,9 @@ func openWindow(dir string, src source) error {
 	if src.kind == sourceWorkingTree || src.kind == sourceBranch {
 		if src.ref == "" {
 			directory := filepath.Dir(cfg.path)
-			if saved, err := reviewstore.LoadSettings(directory); err == nil && saved.Repository == repo.Root {
-				if _, err := repo.Resolve(saved.Branch); err == nil {
-					src.ref = saved.Branch
+			if branch, err := reviewstore.LastBranch(directory, repo.Root); err == nil && branch != "" {
+				if _, err := repo.Resolve(branch); err == nil {
+					src.ref = branch
 				}
 			}
 			if src.ref == "" {

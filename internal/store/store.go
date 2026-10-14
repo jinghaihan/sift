@@ -109,22 +109,6 @@ func (db *Database) Save(record Record) error {
 	return nil
 }
 
-func LoadSettings(directory string) (review.Scope, error) {
-	var scope review.Scope
-	data, err := os.ReadFile(filepath.Join(directory, "session.json"))
-	if errors.Is(err, os.ErrNotExist) {
-		return scope, nil
-	}
-	if err == nil {
-		err = json.Unmarshal(data, &scope)
-	}
-	return scope, err
-}
-
-func SaveSettings(directory string, scope review.Scope) error {
-	return writeJSON(filepath.Join(directory, "session.json"), scope)
-}
-
 func writeJSON(path string, value any) error {
 	data, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {

@@ -59,7 +59,7 @@ func (w *window) loadFeature() {
 		if err == nil && src.kind == sourceFeature {
 			scope := requested
 			if scope.Repository != w.repo.Root || scope.Branch != branch || scope.Start == "" {
-				saved, loadErr := reviewstore.LoadSettings(directory)
+				saved, loadErr := reviewstore.LoadScope(directory, w.repo.Root, branch)
 				if loadErr != nil {
 					err = loadErr
 				} else if saved.Repository == w.repo.Root && saved.Branch == branch && saved.Start != "" {
@@ -108,7 +108,7 @@ func (w *window) loadFeature() {
 			if err == nil {
 				record.Tip = result.Tip
 				if src.kind == sourceFeature {
-					err = reviewstore.SaveSettings(directory, result.Scope)
+					err = reviewstore.SaveScope(directory, result.Scope)
 				}
 			}
 		}
