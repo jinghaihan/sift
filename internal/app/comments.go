@@ -136,7 +136,9 @@ func (w *window) commentsMarkdown() string {
 	var items []string
 	for i, c := range list {
 		context := "No patch context available."
-		if f := byPath[c.path]; f != nil {
+		if c.outdated {
+			context = "Original context (location changed):\n" + c.anchor.Excerpt
+		} else if f := byPath[c.path]; f != nil {
 			if ctx := commentContext(f, c); ctx != "" {
 				context = ctx
 			} else if f.Note != "" {

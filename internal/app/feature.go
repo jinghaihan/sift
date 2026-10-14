@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	"github.com/jinghaihan/sift/internal/diff"
 	"github.com/jinghaihan/sift/internal/git"
@@ -369,22 +367,6 @@ func (w *window) featureDialogs(c *ui.Context) {
 	}
 }
 
-func (w *window) exportFeatureReview() {
-	text := w.commentsMarkdown()
-	if text == "" {
-		return
-	}
-	go func() {
-		path, err := mygo.Dialog.Save(mygo.SaveDialogOptions{Parent: w.win, Title: "Export review", DefaultPath: "sift-review.md"})
-		if err == nil && path != "" {
-			err = os.WriteFile(path, []byte(text), 0o600)
-		}
-		if err != nil {
-			w.update(func() { w.loadErr = err })
-		}
-	}()
-}
-
 func (w *window) featureToolbar(c *ui.Context, pal *palette) {
 	t := c.Theme()
 	left, right := w.toolbarInsets(c)
@@ -431,7 +413,7 @@ func (w *window) featureToolbar(c *ui.Context, pal *palette) {
 		if w.reviewCommentsOpen {
 			comments.Background(pal.hover).TextColor(t.Text)
 		}
-		iconButton(c, iconOpen, "Export review…").Disabled(w.pendingComments() == 0).OnClick(w.exportFeatureReview)
+		w.reviewFilesMenu(c)
 		if w.loading {
 			iconButton(c, iconStop, "Cancel analysis").OnClick(func() {
 				if w.featureCancel != nil {

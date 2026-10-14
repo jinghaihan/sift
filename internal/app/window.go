@@ -56,6 +56,9 @@ type session struct {
 
 // window is a window reviewing a repository.
 type window struct {
+	reviewImport                                            *reviewImportState
+	reviewImportReading                                     bool
+	reviewFileError                                         string
 	featureBranches                                         []string
 	featureBranch                                           string
 	featureScope                                            review.Scope

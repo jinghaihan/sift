@@ -37,6 +37,14 @@ When Git history does not identify the range reliably, Sift asks for the integra
 
 Reviews leave the repository's current branch, working files, and index untouched.
 
+## Review comments
+
+Click a code line or select a range to write a comment. Comments are saved automatically. Open the comments panel in the toolbar to browse your notes and use Previous or Next to walk through them during a review. Comments whose code can no longer be found remain available under Location changed.
+
+To continue on another computer, choose **Review files → Export review**, then open the corresponding feature branch in the other checkout and choose **Import review**. Check the branch and version in the preview before importing. Repeated imports keep one copy of each comment; when a comment has changed, choose which copy to keep.
+
+Use **Export Markdown** or **Copy Markdown** to share readable notes. Markdown exports cannot be imported as reviews.
+
 ## Develop
 
 ```sh
