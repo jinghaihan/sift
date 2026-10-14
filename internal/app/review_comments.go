@@ -183,7 +183,6 @@ func (w *window) clearReviewCommentsDialog(c *ui.Context) {
 		w.clearReviewCommentsOpen = false
 		w.comments, w.discarding = nil, nil
 		w.reviewCommentID = ""
-		w.reviewCommentList = ui.ListState{}
 		w.rowsDirty = true
 		w.saveFeatureReview()
 	}
