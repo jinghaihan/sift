@@ -250,6 +250,7 @@ func Run() {
 	state.open() // before the menu, which lists the recent repositories
 	applyTheme(cfg.Get())
 	mygo.App.SetMenu(buildMenu())
+	mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) { cfg.flushFileExclusions() })
 	cfg.OnChange(func(s Settings) {
 		mygo.RunOnMain(func() {
 			syncMenu(s)

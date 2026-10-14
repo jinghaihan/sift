@@ -73,7 +73,7 @@ func (w *window) compileFileExclusions() {
 }
 
 func (w *window) fileAllowed(name string) bool {
-	if w.showAllFiles || name == w.revealedExcludedPath {
+	if name == w.revealedExcludedPath {
 		return true
 	}
 	if w.exclusionPaths == nil {

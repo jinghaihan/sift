@@ -39,9 +39,9 @@ Reviews leave the repository's current branch, working files, and index untouche
 
 ## File exclusions
 
-Use the filter button beside the file search to edit exclusion rules. Markdown files are hidden initially by `*.md`; change, disable, or delete this rule to include them. Patterns without `/` match file names in any directory; patterns with `/` match paths relative to the repository. Rules apply to all repositories and are saved in the user settings. Clearing every rule keeps all files included after restarting.
+Use the filter button beside the file search to edit exclusion rules. Changes take effect immediately and are saved automatically. Markdown files are hidden initially by `*.md`; change, disable, or delete this rule to include them. Patterns without `/` match file names in any directory; patterns with `/` match paths relative to the repository. Rules apply to all repositories. Clearing every rule keeps all files included after restarting.
 
-The filter button is highlighted while exclusions are active; hover to see the hidden-file count. **Show all files temporarily** reveals files without changing the saved rules. Exclusions affect the file tree and displayed diff; comments are retained, and opening a comment temporarily reveals its file.
+The filter button is highlighted while exclusions are active; hover to see the hidden-file count. Exclusions affect the file tree and displayed diff; comments are retained, and opening a comment temporarily reveals its file.
 
 ## Review comments
 

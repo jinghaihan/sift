@@ -339,10 +339,8 @@ func (w *window) mainArea(c *ui.Context, pal *palette) bool {
 				detail = "Whitespace-only changes hidden"
 			}
 			if w.hiddenFileCount() > 0 && w.filter == "" && !w.searching() {
-				title, detail = "All files are hidden", "Change file exclusions or show all files."
-				emptyPanel(c, pal, title, detail, func() {
-					ui.Button(c, "Show all files").OnClick(func() { w.showAllFiles = true; w.fileFiltersDirty = true })
-				})
+				title, detail = "All files are hidden", ""
+				emptyPanel(c, pal, title, detail, nil)
 			} else {
 				emptyPanel(c, pal, title, detail, nil)
 			}

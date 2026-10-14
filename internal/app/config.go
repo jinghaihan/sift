@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"log"
 	"os"
 	"path/filepath"
@@ -39,6 +40,7 @@ type Settings struct {
 	Theme                string          `json:"theme"` // system, light or dark
 	WordWrap             bool            `json:"wordWrap"`
 	FileExclusions       []fileExclusion `json:"fileExclusions"`
+	fileExclusionsOnly   bool
 }
 
 func defaultSettings() Settings {
@@ -90,12 +92,15 @@ func (s *Settings) normalize() {
 // config holds the settings, shared by the windows, and keeps them in
 // step with the file.
 type config struct {
-	mu       sync.Mutex
-	path     string
-	settings Settings
-	modTime  time.Time
-	onChange map[int]func(Settings)
-	nextID   int
+	mu                    sync.Mutex
+	writeMu               sync.Mutex
+	exclusionVersion      uint64
+	savedExclusionVersion uint64
+	path                  string
+	settings              Settings
+	modTime               time.Time
+	onChange              map[int]func(Settings)
+	nextID                int
 }
 
 var cfg = newConfig()
@@ -120,10 +125,37 @@ func (c *config) Update(fn func(s *Settings)) {
 	c.mu.Lock()
 	fn(&c.settings)
 	c.settings.normalize()
-	s := c.settings
 	c.mu.Unlock()
-	c.write(s)
+	c.write()
+	c.notify(c.Get())
+}
+
+// SetFileExclusions publishes edits immediately. Disk writes run independently
+// of typing and serialize using the latest configuration snapshot.
+func (c *config) SetFileExclusions(rules []fileExclusion) {
+	c.mu.Lock()
+	if slices.Equal(c.settings.FileExclusions, rules) {
+		c.mu.Unlock()
+		return
+	}
+	c.settings.FileExclusions = slices.Clone(rules)
+	c.exclusionVersion++
+	s := c.settings
+	s.fileExclusionsOnly = true
+	c.mu.Unlock()
 	c.notify(s)
+	go c.flushFileExclusions()
+}
+
+func (c *config) flushFileExclusions() {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	c.mu.Lock()
+	pending := c.exclusionVersion != c.savedExclusionVersion
+	c.mu.Unlock()
+	if pending {
+		c.writeCurrent()
+	}
 }
 
 // OnChange calls fn whenever the settings change, from any goroutine, and
@@ -193,7 +225,16 @@ func (c *config) load() bool {
 	return true
 }
 
-func (c *config) write(s Settings) {
+func (c *config) write() {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	c.writeCurrent()
+}
+
+func (c *config) writeCurrent() {
+	c.mu.Lock()
+	s, version := c.settings, c.exclusionVersion
+	c.mu.Unlock()
 	data, err := json.MarshalIndent(map[string]any{"settings": s}, "", "  ")
 	if err != nil {
 		return
@@ -201,13 +242,26 @@ func (c *config) write(s Settings) {
 	if err := os.MkdirAll(filepath.Dir(c.path), 0o755); err != nil {
 		return
 	}
-	if err := os.WriteFile(c.path, append(data, '\n'), 0o644); err != nil {
+	temp, err := os.CreateTemp(filepath.Dir(c.path), ".sift-settings-*")
+	if err != nil {
+		log.Printf("sift: %v", err)
+		return
+	}
+	defer os.Remove(temp.Name())
+	_, writeErr := temp.Write(append(data, '\n'))
+	closeErr := temp.Close()
+	if err := errors.Join(writeErr, closeErr); err != nil {
+		log.Printf("sift: %v", err)
+		return
+	}
+	if err := os.Rename(temp.Name(), c.path); err != nil {
 		log.Printf("sift: %v", err)
 		return
 	}
 	if fi, err := os.Stat(c.path); err == nil {
 		c.mu.Lock()
 		c.modTime = fi.ModTime()
+		c.savedExclusionVersion = version
 		c.mu.Unlock()
 	}
 }
@@ -216,7 +270,7 @@ func (c *config) write(s Settings) {
 // user to edit.
 func (c *config) ensure() string {
 	if _, err := os.Stat(c.path); err != nil {
-		c.write(c.Get())
+		c.write()
 	}
 	return c.path
 }

@@ -91,7 +91,7 @@ func showsFile(w *window, path string) bool {
 	return slices.ContainsFunc(w.rows, func(r row) bool { return r.kind == rowHeader && w.files[r.file].Path == path })
 }
 
-func TestFileExclusionsEditorAndTemporaryVisibility(t *testing.T) {
+func TestFileExclusionsEditToggleAndDeleteImmediately(t *testing.T) {
 	w, tt := newFileExclusionReview(t)
 	patch := w.featureResult.Patch
 	if w.hiddenFileCount() != 2 || showsFile(w, "README.md") || showsFile(w, "docs/guide.md") {
@@ -104,46 +104,51 @@ func TestFileExclusionsEditorAndTemporaryVisibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	snapshot(t, tt, "file-exclusions")
-	if err := tt.Click("Show all files temporarily"); err != nil {
-		t.Fatal(err)
+	if tt.HasText("Apply") || tt.HasText("Cancel") || tt.HasText("Show all files temporarily") {
+		t.Fatal("manual apply controls or removed visibility feature remained")
 	}
-	if !showsFile(w, "README.md") || w.hiddenFileCount() != 0 || !w.settings.FileExclusions[0].Enabled {
-		t.Fatal("show all changed the configured rule or failed to reveal files")
+	add, _ := tt.Find("Add exclusion rule")
+	input, _ := tt.Find("Exclude pattern 1")
+	if add.W < input.W {
+		t.Fatal("Add rule does not span the popover")
 	}
-	tt.Click("Show all files temporarily")
+	tt.Click("Enable rule 1")
+	if !showsFile(w, "README.md") || w.hiddenFileCount() != 0 || cfg.Get().FileExclusions[0].Enabled {
+		t.Fatal("disabling a rule did not take effect immediately")
+	}
+	tt.Click("Enable rule 1")
 	tt.Click("Exclude pattern 1")
 	tt.Command("selectAll")
 	tt.Type("**/*.map")
-	tt.Click("Apply")
 	if !showsFile(w, "README.md") || showsFile(w, "notes.map") || cfg.Get().FileExclusions[0].Pattern != "**/*.map" {
 		t.Fatal("editing the rule did not apply and save")
 	}
-	tt.Click("File exclusions")
 	tt.Click("Enable rule 1")
 	tt.Click("Add rule")
 	tt.Click("Exclude pattern 2")
 	tt.Type("[")
-	tt.Click("Apply")
-	if !w.exclusionsOpen || !tt.HasText("Invalid glob pattern.") {
-		t.Fatal("invalid rule was applied")
+	if !w.exclusionsOpen || !tt.HasText("Invalid glob pattern.") || len(cfg.Get().FileExclusions) != 1 {
+		t.Fatal("invalid rule was saved or its error was hidden")
 	}
 	tt.Command("selectAll")
 	tt.Click("Exclude pattern 2")
 	tt.Command("selectAll")
 	tt.Type("src/generated/**")
-	tt.Click("Apply")
 	if !showsFile(w, "notes.map") || showsFile(w, "src/generated/index.ts") || w.settings.FileExclusions[0].Enabled {
 		t.Fatal("disabled rules or custom directory rules did not apply")
 	}
-	tt.Click("File exclusions")
 	tt.Click("Delete rule 1")
 	tt.Click("Delete rule 1")
-	tt.Click("Apply")
 	if len(cfg.Get().FileExclusions) != 0 || w.hiddenFileCount() != 0 || !showsFile(w, "src/generated/index.ts") {
 		t.Fatal("clearing rules left files hidden")
 	}
 	if w.featureResult.Patch != patch {
 		t.Fatal("display rules changed the computed feature diff")
+	}
+	cfg.flushFileExclusions()
+	reloaded := &config{path: cfg.path, settings: defaultSettings()}
+	if !reloaded.load() || len(reloaded.Get().FileExclusions) != 0 {
+		t.Fatal("live deletion did not persist after restart")
 	}
 }
 
@@ -156,7 +161,7 @@ func TestExcludedCommentCanRevealOnlyItsFile(t *testing.T) {
 	if err := tt.Click("Review comments (1)"); err != nil {
 		t.Fatal(err)
 	}
-	if !showsFile(w, "README.md") || showsFile(w, "docs/guide.md") || w.showAllFiles || w.hiddenFileCount() != 1 {
+	if !showsFile(w, "README.md") || showsFile(w, "docs/guide.md") || w.hiddenFileCount() != 1 {
 		t.Fatal("comment navigation did not temporarily reveal only its own excluded file")
 	}
 	if !strings.Contains(w.commentsMarkdown(), "Discuss the design") {
@@ -166,7 +171,8 @@ func TestExcludedCommentCanRevealOnlyItsFile(t *testing.T) {
 	if err := tt.Click("File exclusions"); err != nil {
 		t.Fatal(err)
 	}
-	tt.Click("Apply")
+	tt.Click("Enable rule 1")
+	tt.Click("Enable rule 1")
 	if showsFile(w, "README.md") || len(w.comments) != 1 {
 		t.Fatal("hiding the revealed file deleted its comment")
 	}
@@ -177,7 +183,7 @@ func TestExcludedCommentCanRevealOnlyItsFile(t *testing.T) {
 	}
 }
 
-func TestAllExcludedFilesHaveShowAllAction(t *testing.T) {
+func TestAllExcludedFilesCanBeRecoveredByDisablingRule(t *testing.T) {
 	w, tt := newFileExclusionReview(t)
 	s := w.settings
 	s.FileExclusions = []fileExclusion{{Pattern: "**", Enabled: true}}
@@ -186,10 +192,38 @@ func TestAllExcludedFilesHaveShowAllAction(t *testing.T) {
 	if !tt.HasText("All files are hidden") {
 		t.Fatal("empty filtered review did not explain why")
 	}
-	if err := tt.Click("Show all files"); err != nil {
+	if tt.HasText("Show all files") {
+		t.Fatal("removed visibility feature remained in the empty review")
+	}
+	if err := tt.Click("File exclusions"); err != nil {
 		t.Fatal(err)
 	}
+	tt.Click("Enable rule 1")
 	if !showsFile(w, "README.md") || w.hiddenFileCount() != 0 {
-		t.Fatal("show all did not recover the diff")
+		t.Fatal("disabling the rule did not recover the diff")
+	}
+}
+
+func TestLiveExclusionsSaveLatestAndPreserveWindowAppearance(t *testing.T) {
+	c := &config{path: filepath.Join(t.TempDir(), "sift.jsonc"), settings: defaultSettings()}
+	w := &window{settings: defaultSettings()}
+	w.settings.DiffStyle, w.settings.WordWrap = "unified", true
+	off := c.OnChange(w.applySettings)
+	defer off()
+	// Persistence may be busy, but edits and notifications must remain immediate.
+	c.writeMu.Lock()
+	c.SetFileExclusions([]fileExclusion{{Pattern: "*.map", Enabled: true}})
+	got := c.Get()
+	c.writeMu.Unlock()
+	if got.FileExclusions[0].Pattern != "*.map" || w.settings.DiffStyle != "unified" || !w.settings.WordWrap {
+		t.Fatal("live edits waited for disk or reset the window's appearance")
+	}
+	for _, pattern := range []string{"*", "*.", "*.m", "*.md"} {
+		c.SetFileExclusions([]fileExclusion{{Pattern: pattern, Enabled: true}})
+	}
+	c.flushFileExclusions()
+	reloaded := &config{path: c.path, settings: defaultSettings()}
+	if !reloaded.load() || reloaded.Get().FileExclusions[0].Pattern != "*.md" {
+		t.Fatal("a late save replaced the latest typed rule")
 	}
 }

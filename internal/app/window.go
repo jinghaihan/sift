@@ -113,7 +113,6 @@ type window struct {
 	exclusionMatchers    []pathGlob
 	exclusionPaths       map[string]bool
 	fileFiltersDirty     bool
-	showAllFiles         bool
 	revealedExcludedPath string
 	treeList             ui.ListState
 	treeSel              string // the key of the row chosen
@@ -432,6 +431,11 @@ func shortHash(h string) string {
 
 // applySettings takes settings changed in the file or the menus.
 func (w *window) applySettings(s Settings) {
+	if s.fileExclusionsOnly {
+		rules := s.FileExclusions
+		s = w.settings
+		s.FileExclusions = rules
+	}
 	old := w.settings
 	w.settings = s
 	if !slices.Equal(old.FileExclusions, s.FileExclusions) {
@@ -535,7 +539,6 @@ func (w *window) setSource(src source) {
 // other's.
 func (w *window) switchTo(src source) {
 	w.exclusionsOpen = false
-	w.showAllFiles = false
 	w.revealedExcludedPath = ""
 	w.fileFiltersDirty = true
 	w.saveFeatureReview()

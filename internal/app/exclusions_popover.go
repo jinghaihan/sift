@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/egoist/mygo/ui"
 )
@@ -28,27 +29,28 @@ func (w *window) toggleFileExclusions() {
 	}
 }
 
-func (w *window) applyFileExclusions() {
+func (w *window) syncFileExclusions() {
 	rules := make([]fileExclusion, 0, len(w.exclusionDrafts))
 	for _, draft := range w.exclusionDrafts {
-		if _, err := compilePathGlob(draft.Pattern); err != nil {
-			return
+		rule := draft.fileExclusion
+		rule.Pattern = strings.TrimSpace(rule.Pattern)
+		if _, err := compilePathGlob(rule.Pattern); err != nil {
+			continue
 		}
-		rules = append(rules, draft.fileExclusion)
+		rules = append(rules, rule)
 	}
 	s := w.settings
 	s.FileExclusions = rules
 	w.applySettings(s)
 	w.revealedExcludedPath = ""
 	w.fileFiltersDirty = true
-	w.exclusionsOpen = false
-	w.background(func() { cfg.Update(func(s *Settings) { s.FileExclusions = slices.Clone(rules) }) })
+	cfg.SetFileExclusions(rules)
 }
 
 func (w *window) fileExclusionsButton(c *ui.Context, pal *palette) {
 	t := c.Theme()
 	hidden := w.hiddenFileCount()
-	active := !w.showAllFiles && len(w.exclusionMatchers) > 0
+	active := len(w.exclusionMatchers) > 0
 	trigger := iconButton(c, iconFilter, "File exclusions").Tooltip(fmt.Sprintf("File exclusions · %d files hidden", hidden)).OnClick(w.toggleFileExclusions)
 	if active {
 		trigger.Background(pal.hover).TextColor(t.Text)
@@ -62,28 +64,23 @@ func (w *window) fileExclusionsButton(c *ui.Context, pal *palette) {
 			ui.Text(c, "File exclusions").FontSize(13).Bold().Grow(1)
 			iconButton(c, iconClose, "Close file exclusions").OnClick(func() { w.exclusionsOpen = false })
 		})
-		ui.Checkbox(c, &w.showAllFiles, "Show all files temporarily").OnChange(func() {
-			w.revealedExcludedPath = ""
-			w.fileFiltersDirty = true
-		})
-		valid := true
 		ui.Scroll(c).MaxHeight(min(280, height-260)).FillWidth().Children(func() {
 			ui.Column(c).Gap(6).FillWidth().Children(func() {
 				for i, draft := range w.exclusionDrafts {
 					c.Key(draft.id)
 					ui.Column(c).Gap(3).FillWidth().Children(func() {
 						ui.Row(c).Gap(6).FillWidth().Children(func() {
-							ui.Checkbox(c, &draft.Enabled, "").Label(fmt.Sprintf("Enable rule %d", i+1)).Tooltip("Enable this rule")
-							input := ui.TextInput(c, &draft.Pattern).Label(fmt.Sprintf("Exclude pattern %d", i+1)).Placeholder("*.md").Grow(1).MinWidth(0)
+							ui.Checkbox(c, &draft.Enabled, "").Label(fmt.Sprintf("Enable rule %d", i+1)).Tooltip("Enable this rule").OnChange(w.syncFileExclusions)
+							input := ui.TextInput(c, &draft.Pattern).Label(fmt.Sprintf("Exclude pattern %d", i+1)).Placeholder("*.md").Grow(1).MinWidth(0).OnChange(w.syncFileExclusions)
 							if input.Focused() {
 								w.typing = true
 							}
 							iconButton(c, iconTrash, fmt.Sprintf("Delete rule %d", i+1)).OnClick(func() {
 								w.exclusionDrafts = slices.DeleteFunc(w.exclusionDrafts, func(other *exclusionDraft) bool { return other == draft })
+								w.syncFileExclusions()
 							})
 						})
-						if _, err := compilePathGlob(draft.Pattern); err != nil {
-							valid = false
+						if _, err := compilePathGlob(draft.Pattern); err != nil && draft.Pattern != "" {
 							ui.Text(c, err.Error()).FontSize(11).TextColor(t.Warning).FillWidth()
 						}
 					})
@@ -93,11 +90,6 @@ func (w *window) fileExclusionsButton(c *ui.Context, pal *palette) {
 				}
 			})
 		})
-		ui.Row(c).Margin(8, 0, 0).Gap(6).Children(func() {
-			ui.Button(c, "Add rule").OnClick(func() { w.addExclusionDraft(fileExclusion{Enabled: true}) })
-			ui.Spacer(c)
-			ui.Button(c, "Cancel").OnClick(func() { w.exclusionsOpen = false })
-			ui.PrimaryButton(c, "Apply").Disabled(!valid).OnClick(w.applyFileExclusions)
-		})
+		ui.Button(c, "Add rule").Label("Add exclusion rule").FillWidth().Margin(8, 0, 0).OnClick(func() { w.addExclusionDraft(fileExclusion{Enabled: true}) })
 	})
 }
