@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/jinghaihan/sift/internal/diff"
+	reviewstore "github.com/jinghaihan/sift/internal/store"
 )
 
 // side is the side of a diff a comment is on.
@@ -21,6 +23,9 @@ const (
 type comment struct {
 	storeID    string
 	outdated   bool
+	anchor     reviewstore.Anchor
+	created    time.Time
+	resolved   bool
 	id         int
 	path       string
 	side       side

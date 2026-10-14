@@ -49,7 +49,14 @@ func (w *window) view(c *ui.Context) {
 		}
 		ui.Column(c).Grow(1).MinWidth(0).Background(pal.appBg).Children(func() {
 			w.toolbar(c, pal)
-			reviewBuilt = w.mainArea(c, pal)
+			ui.Row(c).Grow(1).MinHeight(0).Children(func() {
+				ui.Column(c).Grow(1).MinWidth(0).Disabled(w.loading && w.isFeatureReview()).Children(func() {
+					reviewBuilt = w.mainArea(c, pal)
+				})
+				if w.reviewCommentsOpen && w.isFeatureReview() {
+					w.reviewCommentsPane(c, pal)
+				}
+			})
 		})
 		if w.sidebarShown && right {
 			w.sidebarResizer(c, pal)

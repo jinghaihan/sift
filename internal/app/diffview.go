@@ -715,7 +715,7 @@ func (w *window) commentRow(c *ui.Context, pal *palette, f *fileState, cm *comme
 				w.deleteComment(cm)
 			}
 			cm.wasFocused = focused
-			if focused {
+			if focused || cm.storeID != "" && cm.storeID == w.reviewCommentID {
 				box.Border(1, t.Accent.Alpha(0.6))
 			}
 			if w.source.kind == sourcePull {

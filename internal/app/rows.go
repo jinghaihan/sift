@@ -385,6 +385,12 @@ func (w *window) appendUnplaced(rows []row, idx int32, f *fileState) []row {
 			rows = append(rows, row{kind: rowAINote, file: idx, note: n})
 		}
 	}
+	for _, cm := range w.comments {
+		if cm.path == f.Path && cm.pending() && !w.placed[cm] {
+			rows = append(rows, row{kind: rowComment, file: idx, comment: cm})
+			w.placed[cm] = true
+		}
+	}
 	return rows
 }
 
@@ -421,13 +427,14 @@ func (w *window) appendComments(rows []row, idx int32, f *fileState, l *diff.Lin
 		}
 	}
 	for _, cm := range w.comments {
-		if cm.path != f.Path {
+		if cm.path != f.Path || cm.outdated || w.placed[cm] {
 			continue
 		}
 		// Unchanged lines take comments on either side.
 		if (cm.side == sideOld && l.Kind != diff.Add && cm.line == l.Old) ||
 			(cm.side == sideNew && l.Kind != diff.Del && cm.line == l.New) {
 			rows = append(rows, row{kind: rowComment, file: idx, comment: cm})
+			w.placed[cm] = true
 		}
 	}
 	return rows

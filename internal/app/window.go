@@ -67,6 +67,9 @@ type window struct {
 	featureHistoryOpen                                      bool
 	featureRangeStart, featureRangeIntegration              string
 	featureClosing, featureCloseReady, featureQuitRequested bool
+	reviewCommentsOpen                                      bool
+	reviewCommentID                                         string
+	reviewCommentList                                       ui.ListState
 	win                                                     *mygo.Window
 	repo                                                    *git.Repo
 	launch                                                  source // what the window was opened on

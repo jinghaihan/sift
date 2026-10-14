@@ -19,6 +19,8 @@ import (
 )
 
 func (w *window) loadFeature() {
+	w.saveFeatureReview()
+	pendingDB, pendingRecord := w.featureDB, w.featureRecord.Clone()
 	if w.featureCancel != nil {
 		w.featureCancel()
 	}
@@ -44,7 +46,15 @@ func (w *window) loadFeature() {
 		var database *reviewstore.Database
 		var branches []string
 		var err error
-		info, err := review.Inspect(ctx, w.repo.Root)
+		// Finish the latest save before reopening its record on refresh or a
+		// quick source switch. Older queued saves are rejected by sequence.
+		if pendingDB != nil {
+			err = pendingDB.Save(pendingRecord)
+		}
+		var info review.Repository
+		if err == nil {
+			info, err = review.Inspect(ctx, w.repo.Root)
+		}
 		branches = info.Branches
 		if err == nil && src.kind == sourceFeature {
 			scope := requested
@@ -218,7 +228,7 @@ func (w *window) restoreFeatureComments() {
 		if anchor.Side == 0 {
 			sd = sideOld
 		}
-		w.comments = append(w.comments, &comment{id: commentIDs, path: saved.Path, side: sd, start: anchor.Start, line: anchor.End, text: saved.Body, storeID: saved.ID, outdated: outdated})
+		w.comments = append(w.comments, &comment{id: commentIDs, path: saved.Path, side: sd, start: anchor.Start, line: anchor.End, text: saved.Body, storeID: saved.ID, outdated: outdated, anchor: saved.Anchor, created: saved.Created, resolved: saved.Resolved})
 	}
 }
 
@@ -234,6 +244,7 @@ func (w *window) featureRecordSnapshot() reviewstore.Record {
 		if anchor.Start == 0 {
 			anchor.Start = anchor.End
 		}
+		anchor.Start, anchor.End = min(anchor.Start, anchor.End), max(anchor.Start, anchor.End)
 		if cm.side == sideOld {
 			anchor.Side = 0
 		}
@@ -272,12 +283,7 @@ func (w *window) featureRecordSnapshot() reviewstore.Record {
 		}
 		anchor.Excerpt = strings.Join(lines, "\n")
 		if cm.outdated {
-			for _, saved := range w.featureRecord.Comments {
-				if saved.ID == cm.storeID {
-					anchor = saved.Anchor
-					break
-				}
-			}
+			anchor = cm.anchor
 		}
 		value := reviewstore.NewComment(cm.path, cm.path, cm.text, anchor)
 		if cm.storeID == "" {
@@ -285,6 +291,10 @@ func (w *window) featureRecordSnapshot() reviewstore.Record {
 		} else {
 			value.ID = cm.storeID
 		}
+		if cm.created.IsZero() {
+			cm.created = value.Created.UTC()
+		}
+		value.Created, value.Resolved = cm.created, cm.resolved
 		value.Outdated = cm.outdated
 		record.Comments = append(record.Comments, value)
 	}
@@ -417,7 +427,10 @@ func (w *window) featureToolbar(c *ui.Context, pal *palette) {
 		if w.settings.WordWrap {
 			wrap.Background(pal.hover).TextColor(t.Text)
 		}
-		iconButton(c, iconComment, "Copy review comments ("+strconv.Itoa(w.pendingComments())+")").Disabled(w.pendingComments() == 0).OnClick(w.copyComments)
+		comments := iconButton(c, iconComment, "Review comments ("+strconv.Itoa(w.pendingComments())+")").OnClick(w.toggleReviewComments)
+		if w.reviewCommentsOpen {
+			comments.Background(pal.hover).TextColor(t.Text)
+		}
 		iconButton(c, iconOpen, "Export review…").Disabled(w.pendingComments() == 0).OnClick(w.exportFeatureReview)
 		if w.loading {
 			iconButton(c, iconStop, "Cancel analysis").OnClick(func() {
