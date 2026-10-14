@@ -24,13 +24,13 @@ I wanted a way to review one complete feature and leave comments, without manual
 Requires Go 1.27.2 or later and Git 2.36 or later.
 
 ```sh
-go run . /path/to/repository
+go run ./cmd/sift /path/to/repository
 ```
 
 To open a particular feature branch:
 
 ```sh
-go run . --branch feature/my-change /path/to/repository
+go run ./cmd/sift --branch feature/my-change /path/to/repository
 ```
 
 When Git history does not identify the range reliably, Sift asks for the integration branch and first feature commit. The first commit is included in the review, and the range is remembered for that branch.

@@ -2,7 +2,7 @@
 
 The native review interface is based on [Godiff](https://github.com/egoist/godiff)
 by [EGOIST](https://github.com/egoist). Its original implementation is retained
-in the root Go files and `internal/agent`, `internal/diff`, `internal/fileicon`,
+in `internal/app` and `internal/agent`, `internal/diff`, `internal/fileicon`,
 `internal/git`, `internal/github`, `internal/highlight`, `internal/proc`, and
 `internal/shellenv`. Changes to these files adapt it to Sift.
 

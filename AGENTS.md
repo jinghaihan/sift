@@ -28,10 +28,13 @@ add a web frontend without a demonstrated native limitation.
 
 - `internal/review`: Git history, isolation, and review result. No UI dependency.
 - `internal/store`: local review records and Markdown export.
-- Root native views: retain Godiff's file tree, continuous diff cards, inline
+- `cmd/sift/main.go`: thin executable entry point calling `app.Run`.
+- `internal/app`: application startup, command line handling and native views.
+  Retain Godiff's file tree, continuous diff cards, inline
   comments and keyboard navigation. Do not replace these with an independent UI.
-- `feature.go`: connects feature isolation and local review records to Godiff.
-- `main.go`: application startup and command line handling.
+- `internal/app/feature.go`: connects feature isolation and local review records
+  to Godiff.
+- `mygo.json`: points the development and packaging commands at `./cmd/sift`.
 - Imported packages and permission status are documented in `UPSTREAM.md`.
 
 ## Conventions
