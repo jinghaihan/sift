@@ -13,14 +13,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jinghaihan/sift/internal/git"
 	"github.com/egoist/mygo/ui"
+	"github.com/jinghaihan/sift/internal/git"
 )
 
 func TestMain(m *testing.M) {
 	// Keep the user's settings out of the tests, and the tests' out of them.
-	dir, _ := os.MkdirTemp("", "godiff-config")
-	cfg.path = filepath.Join(dir, "godiff.jsonc")
+	dir, _ := os.MkdirTemp("", "sift-config")
+	cfg.path = filepath.Join(dir, "sift.jsonc")
 	cfg.settings = defaultSettings()
 	code := m.Run()
 	os.RemoveAll(dir)
@@ -104,9 +104,9 @@ func newTestWindow(t *testing.T, dir string) (*window, *ui.Tester) {
 	return w, tt
 }
 
-// snapshot saves the tester's frame in $GODIFF_SNAPSHOTS, to look at.
+// snapshot saves the tester's frame in $SIFT_SNAPSHOTS, to look at.
 func snapshot(t *testing.T, tt *ui.Tester, name string) {
-	dir := os.Getenv("GODIFF_SNAPSHOTS")
+	dir := os.Getenv("SIFT_SNAPSHOTS")
 	if dir == "" {
 		return
 	}

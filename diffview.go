@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/egoist/mygo/ui"
 	"github.com/jinghaihan/sift/internal/diff"
 	"github.com/jinghaihan/sift/internal/highlight"
-	"github.com/egoist/mygo/ui"
 )
 
 // cardRadius rounds the corners of the files' cards.
@@ -677,13 +677,16 @@ func (w *window) commentRow(c *ui.Context, pal *palette, f *fileState, cm *comme
 			ui.Row(c).Height(32).Padding(0, 4, 0, 10).Gap(8).BorderWidth(0, 0, 1, 0).BorderColor(pal.cardBorder).Children(func() {
 				ui.Text(c, w.userName()).FontSize(12).Bold()
 				ui.Text(c, cm.label()).FontSize(11).TextColor(t.TextMuted)
+				if cm.outdated {
+					ui.Text(c, "Outdated").FontSize(11).TextColor(t.Warning)
+				}
 				ui.Spacer(c)
 				if iconButton(c, iconClose, "Delete comment").Size(24, 24).Clicked() {
 					w.deleteComment(cm)
 				}
 			})
 			area := ui.TextAreaBase(c, &cm.text).Placeholder("Write a review comment…").MinHeight(64).Padding(8, 10).
-				FontSize(13).Label("Review comment")
+				FontSize(13).Label("Review comment").OnChange(w.saveFeatureReview)
 			if cm.focus {
 				area.Focus()
 				cm.focus = false

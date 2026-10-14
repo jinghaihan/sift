@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/egoist/mygo/ui"
 	"github.com/jinghaihan/sift/internal/agent"
 	"github.com/jinghaihan/sift/internal/diff"
 	"github.com/jinghaihan/sift/internal/git"
-	"github.com/egoist/mygo/ui"
 )
 
 // groupMode is how the review groups its files, as pulls.review does: by

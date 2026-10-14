@@ -3,8 +3,8 @@ package main
 import (
 	"strings"
 
-	"github.com/jinghaihan/sift/internal/diff"
 	"github.com/egoist/mygo/ui"
+	"github.com/jinghaihan/sift/internal/diff"
 )
 
 // match is a line holding the query of the find bar, or a file whose path

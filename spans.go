@@ -4,9 +4,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/egoist/mygo/ui"
 	"github.com/jinghaihan/sift/internal/diff"
 	"github.com/jinghaihan/sift/internal/highlight"
-	"github.com/egoist/mygo/ui"
 )
 
 // tabWidth is the columns a tab takes.

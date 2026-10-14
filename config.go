@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jinghaihan/sift/internal/agent"
 	"github.com/egoist/mygo"
+	"github.com/jinghaihan/sift/internal/agent"
 )
 
-// Settings are the user's preferences, in ~/.godiff/godiff.jsonc as
+// Settings are the user's preferences, in ~/.sift/sift.jsonc as
 // codiff keeps its own in ~/.codiff/codiff.jsonc.
 type Settings struct {
 	CodeFontFamily      string `json:"codeFontFamily"`
@@ -42,6 +42,7 @@ type Settings struct {
 
 func defaultSettings() Settings {
 	return Settings{
+		CodeFontFamily:       "Geist Mono",
 		CodeFontSize:         13,
 		DiffStyle:            "split",
 		ReviewCommentsPrefix: "# Address these Review Comments",
@@ -92,7 +93,7 @@ var cfg = newConfig()
 
 func newConfig() *config {
 	home, _ := os.UserHomeDir()
-	c := &config{path: filepath.Join(home, ".godiff", "godiff.jsonc"), settings: defaultSettings()}
+	c := &config{path: filepath.Join(home, ".sift", "sift.jsonc"), settings: defaultSettings()}
 	c.load()
 	return c
 }
@@ -163,7 +164,7 @@ func (c *config) load() bool {
 		Settings json.RawMessage `json:"settings"`
 	}
 	if err := json.Unmarshal(stripJSONC(data), &file); err != nil {
-		log.Printf("godiff: %s: %v", c.path, err)
+		log.Printf("sift: %s: %v", c.path, err)
 		return false
 	}
 	s := defaultSettings()
@@ -190,7 +191,7 @@ func (c *config) write(s Settings) {
 		return
 	}
 	if err := os.WriteFile(c.path, append(data, '\n'), 0o644); err != nil {
-		log.Printf("godiff: %v", err)
+		log.Printf("sift: %v", err)
 		return
 	}
 	if fi, err := os.Stat(c.path); err == nil {

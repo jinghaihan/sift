@@ -16,3 +16,6 @@ permission. Existing third-party notices remain in place, including
 
 Sift's original contributions include `internal/review`, `internal/store`,
 and the feature-range adapter. These contributions are licensed under MIT.
+
+The House navigation icon is from [Lucide](https://github.com/lucide-icons/lucide/blob/main/icons/house.svg).
+Its ISC license is retained in `resources/licenses/lucide.txt`.

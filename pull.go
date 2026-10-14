@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/egoist/mygo"
 	"github.com/jinghaihan/sift/internal/diff"
 	"github.com/jinghaihan/sift/internal/git"
 	"github.com/jinghaihan/sift/internal/github"
-	"github.com/egoist/mygo"
 )
 
 // ghRemote is the remote of a repository on GitHub.

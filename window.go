@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -14,12 +15,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/ui"
 	"github.com/jinghaihan/sift/internal/diff"
 	"github.com/jinghaihan/sift/internal/git"
 	"github.com/jinghaihan/sift/internal/github"
 	"github.com/jinghaihan/sift/internal/highlight"
-	"github.com/egoist/mygo"
-	"github.com/egoist/mygo/ui"
+	"github.com/jinghaihan/sift/internal/review"
+	reviewstore "github.com/jinghaihan/sift/internal/store"
 )
 
 // sourceKind is what a window reviews.
@@ -30,6 +33,8 @@ const (
 	sourceCommit                        // a commit, against its first parent
 	sourceBranch                        // the work tree since it branched from a branch
 	sourcePull                          // a pull request on GitHub, since it branched
+	sourceFeature                       // complete feature contribution, excluding integration
+	sourceHistorical                    // explicitly labeled historical conflict material
 )
 
 type source struct {
@@ -51,11 +56,22 @@ type session struct {
 
 // window is a window reviewing a repository.
 type window struct {
-	win      *mygo.Window
-	repo     *git.Repo
-	launch   source // what the window was opened on
-	source   source
-	settings Settings
+	featureBranches                                         []string
+	featureBranch                                           string
+	featureScope                                            review.Scope
+	featureResult                                           *review.Result
+	featureCancel                                           context.CancelFunc
+	featureDB                                               *reviewstore.Database
+	featureRecord                                           reviewstore.Record
+	featureRangeOpen                                        bool
+	featureHistoryOpen                                      bool
+	featureRangeStart, featureRangeIntegration              string
+	featureClosing, featureCloseReady, featureQuitRequested bool
+	win                                                     *mygo.Window
+	repo                                                    *git.Repo
+	launch                                                  source // what the window was opened on
+	source                                                  source
+	settings                                                Settings
 
 	branch     string
 	files      []*fileState
@@ -111,7 +127,7 @@ type window struct {
 	focusList        bool
 	focusedOnce      bool
 	focusHistory     bool
-	switchedAt       time.Time // when the source last changed, for GODIFF_DEBUG
+	switchedAt       time.Time // when the source last changed, for SIFT_DEBUG
 	debugPressed     bool
 	// hold keeps the background work of tests in held, to run frames
 	// while it waits.
@@ -208,6 +224,20 @@ func openWindow(dir string, src source) error {
 	if err != nil {
 		return err
 	}
+	if src.kind == sourceWorkingTree || src.kind == sourceBranch {
+		if src.ref == "" {
+			directory := filepath.Dir(cfg.path)
+			if saved, err := reviewstore.LoadSettings(directory); err == nil && saved.Repository == repo.Root {
+				if _, err := repo.Resolve(saved.Branch); err == nil {
+					src.ref = saved.Branch
+				}
+			}
+			if src.ref == "" {
+				src.ref = repo.Branch()
+			}
+		}
+		src.kind = sourceFeature
+	}
 	if src.kind == sourceCommit {
 		hash, err := repo.Resolve(src.ref)
 		if err != nil {
@@ -251,15 +281,56 @@ func openWindow(dir string, src source) error {
 	windows = append(windows, w)
 	windowsMu.Unlock()
 	stop := make(chan struct{})
-	w.win.OnClose(func(*mygo.CloseEvent) {
+	w.win.OnClose(func(event *mygo.CloseEvent) {
+		if w.featureDB != nil && !w.featureCloseReady {
+			event.PreventDefault()
+			if !w.featureClosing {
+				w.featureClosing = true
+				if w.featureCancel != nil {
+					w.featureCancel()
+				}
+				w.saveFeatureReview()
+				record, database := w.featureRecord.Clone(), w.featureDB
+				snapshot := w.featureResult
+				go func() {
+					err := database.Save(record)
+					if err == nil && snapshot != nil {
+						_ = snapshot.Close()
+					}
+					w.update(func() {
+						w.featureClosing = false
+						if err != nil {
+							w.loadErr = fmt.Errorf("save review before closing: %w", err)
+							return
+						}
+						w.featureCloseReady = true
+						if w.featureQuitRequested {
+							mygo.App.Quit()
+						} else {
+							w.win.Close()
+						}
+					})
+				}()
+			}
+			return
+		}
 		if w.settings.CopyCommentsOnClose && len(w.comments) > 0 {
 			mygo.Clipboard.WriteText(w.commentsMarkdown())
 		}
 	})
 	offSettings := cfg.OnChange(func(s Settings) { w.win.Update(func() { w.applySettings(s) }) })
+	offQuit := mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) { w.featureQuitRequested = true })
 	w.win.OnClosed(func() {
+		w.genA.Add(1)
+		if w.featureCancel != nil {
+			w.featureCancel()
+		}
+		if snapshot := w.featureResult; snapshot != nil {
+			go snapshot.Close()
+		}
 		close(stop)
 		offSettings()
+		offQuit()
 		windowsMu.Lock()
 		for i, o := range windows {
 			if o == w {
@@ -284,23 +355,25 @@ func openWindow(dir string, src source) error {
 func newWindow(repo *git.Repo, src source) *window {
 	width, shown := state.layout()
 	w := &window{
-		repo:         repo,
-		launch:       src,
-		source:       src,
-		settings:     cfg.Get(),
-		sidebarShown: shown,
-		sidebarWidth: width,
-		historyLimit: historyPage,
-		viewed:       state.viewed(viewedKey(repo.Root, src)),
-		hscroll:      map[string]float32{},
-		closedDirs:   map[string]bool{},
-		commitTimes:  map[string]commitTime{},
-		reloaded:     map[string]bool{},
-		fileMatches:  map[int]bool{},
-		selFile:      -1,
-		selHunk:      -1,
-		prs:          map[source]*pullState{},
-		analyses:     map[source]*analysisState{},
+		featureBranch:   src.ref,
+		featureBranches: []string{src.ref},
+		repo:            repo,
+		launch:          src,
+		source:          src,
+		settings:        cfg.Get(),
+		sidebarShown:    shown,
+		sidebarWidth:    width,
+		historyLimit:    historyPage,
+		viewed:          state.viewed(viewedKey(repo.Root, src)),
+		hscroll:         map[string]float32{},
+		closedDirs:      map[string]bool{},
+		commitTimes:     map[string]commitTime{},
+		reloaded:        map[string]bool{},
+		fileMatches:     map[int]bool{},
+		selFile:         -1,
+		selHunk:         -1,
+		prs:             map[source]*pullState{},
+		analyses:        map[source]*analysisState{},
 	}
 	w.gh, _ = findGitHubRemote(repo, github.Repo{})
 	if src.kind == sourcePull {
@@ -313,7 +386,7 @@ func newWindow(repo *git.Repo, src source) *window {
 	return w
 }
 
-// windowTitle is "<repository>[/<source>] · Godiff".
+// windowTitle is "<repository>[/<source>] · Sift".
 func windowTitle(root string, src source) string {
 	name := filepath.Base(root)
 	switch src.kind {
@@ -325,7 +398,7 @@ func windowTitle(root string, src source) string {
 		_, n := src.pull()
 		name += fmt.Sprintf("/#%d", n)
 	}
-	return name + " · Godiff"
+	return name + " · Sift"
 }
 
 func shortHash(h string) string {
@@ -378,7 +451,11 @@ func (w *window) update(fn func()) {
 			}
 		}
 	}
-	w.win.Update(fn)
+	w.win.Update(func() {
+		if !w.win.IsDestroyed() {
+			fn()
+		}
+	})
 }
 
 func (w *window) invalidate() {
@@ -430,6 +507,7 @@ func (w *window) setSource(src source) {
 // switchTo makes a source the one shown, its review in place of the
 // other's.
 func (w *window) switchTo(src source) {
+	w.saveFeatureReview()
 	// Each source keeps its review: the comments, and what was viewed of a
 	// commit.
 	if w.sessions == nil {
@@ -474,6 +552,10 @@ const preloadBudget = 80 * time.Millisecond
 // load reads the changes of the source, the contents of the first files
 // within preloadBudget, then the contents of the others.
 func (w *window) load() {
+	if w.source.kind == sourceFeature || w.source.kind == sourceHistorical {
+		w.loadFeature()
+		return
+	}
 	w.gen++
 	gen := w.gen
 	src := w.source
@@ -717,6 +799,7 @@ func (w *window) setViewed(f *fileState, viewed bool) {
 	}
 	f.collapsed = viewed
 	w.rowsDirty = true
+	w.saveFeatureReview()
 }
 
 // maxContent is the size of the files whose contents are loaded.
@@ -1075,11 +1158,11 @@ func probeMainThread(d time.Duration) {
 	log.Printf("main thread: worst wait %v, average %v, %d of %d waits over 16ms", worst, total/time.Duration(max(n, 1)), slow, n)
 }
 
-// watchMainThread logs, for GODIFF_DEBUG, whenever the main thread keeps
+// watchMainThread logs, for SIFT_DEBUG, whenever the main thread keeps
 // a function waiting over 30ms: when the window cannot respond.
 func watchMainThread() {
 	limit := 30 * time.Millisecond
-	if ms, err := strconv.Atoi(os.Getenv("GODIFF_DEBUG_BLOCK_MS")); err == nil {
+	if ms, err := strconv.Atoi(os.Getenv("SIFT_DEBUG_BLOCK_MS")); err == nil {
 		limit = time.Duration(ms) * time.Millisecond
 	}
 	var gc debug.GCStats

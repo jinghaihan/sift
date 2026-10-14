@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jinghaihan/sift/internal/github"
 	"github.com/egoist/mygo/ui"
+	"github.com/jinghaihan/sift/internal/github"
 )
 
 // pullsView lists the open pull requests of the repository's remote on

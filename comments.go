@@ -19,6 +19,8 @@ const (
 // comment is a review comment on a line, or a range of lines of one side,
 // anchored on its last line.
 type comment struct {
+	storeID    string
+	outdated   bool
 	id         int
 	path       string
 	side       side
@@ -68,6 +70,7 @@ func (w *window) addComment(path string, sd side, start, line int) {
 func (w *window) deleteComment(c *comment) {
 	w.comments = slices.DeleteFunc(w.comments, func(o *comment) bool { return o == c })
 	w.rowsDirty = true
+	w.saveFeatureReview()
 }
 
 // pendingComments counts the comments with text.

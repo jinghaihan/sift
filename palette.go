@@ -3,10 +3,10 @@ package main
 import (
 	"strings"
 
-	"github.com/jinghaihan/sift/internal/agent"
-	"github.com/jinghaihan/sift/internal/github"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"github.com/jinghaihan/sift/internal/agent"
+	"github.com/jinghaihan/sift/internal/github"
 )
 
 // command is an action of the command bar.

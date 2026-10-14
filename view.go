@@ -9,11 +9,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jinghaihan/sift/internal/git"
 	"github.com/egoist/mygo/ui"
+	"github.com/jinghaihan/sift/internal/git"
 )
 
 func (w *window) view(c *ui.Context) {
+	fontTheme := *c.Theme()
+	fontTheme.Font = "Geist, system-ui"
+	c.SetTheme(&fontTheme)
 	if debugFrames {
 		start := time.Now()
 		defer func() {
@@ -38,7 +41,7 @@ func (w *window) view(c *ui.Context) {
 	c.Root().Background(w.sidebarBg(t))
 
 	reviewBuilt := false
-	ui.Row(c).Fill().AlignItems(ui.Stretch).Children(func() {
+	ui.Row(c).Fill().AlignItems(ui.Stretch).Disabled(w.featureClosing).Children(func() {
 		right := w.settings.SidebarPosition == "right"
 		if w.sidebarShown && !right {
 			w.sidebar(c)
@@ -58,6 +61,7 @@ func (w *window) view(c *ui.Context) {
 	w.sourceDialog(c)
 	w.shortcutsHelp(c)
 	w.reviewDialog(c)
+	w.featureDialogs(c)
 	if w.discarding != nil {
 		open := true
 		if choice := ui.AlertDialog(c, &open, "Discard this review comment?", "Its text will be lost.", "Cancel", "Discard"); choice == 1 {
@@ -78,21 +82,16 @@ func (w *window) view(c *ui.Context) {
 }
 
 // debugFrames logs the views that take long to build.
-var debugFrames = os.Getenv("GODIFF_DEBUG") != ""
+var debugFrames = os.Getenv("SIFT_DEBUG") != ""
 
 // toolbar is the bar along the top of the review, which drags the window.
 func (w *window) toolbar(c *ui.Context, pal *palette) {
+	if w.source.kind == sourceFeature || w.source.kind == sourceHistorical {
+		w.featureToolbar(c, pal)
+		return
+	}
 	t := c.Theme()
-	bar := c.TitleBar()
-	sidebarRight := w.sidebarShown && w.settings.SidebarPosition == "right"
-	left := float32(14)
-	if !w.sidebarShown || sidebarRight {
-		left = bar.Left + 8
-	}
-	right := float32(12)
-	if !sidebarRight {
-		right += bar.Right
-	}
+	left, right := w.toolbarInsets(c)
 	ui.Row(c).Height(titleBarHeight).Padding(0, right, 0, left).Gap(8).Shrink(0).DragWindow().
 		BorderWidth(0, 0, 1, 0).BorderColor(pal.cardBorder).Background(pal.headerBg.Alpha(0.6)).Children(func() {
 		if !w.sidebarShown {
@@ -161,6 +160,20 @@ func (w *window) toolbar(c *ui.Context, pal *palette) {
 			w.layoutControl(c, pal)
 		}
 	})
+}
+
+// toolbarInsets reserves room for window controls when the sidebar does not.
+func (w *window) toolbarInsets(c *ui.Context) (left, right float32) {
+	bar := c.TitleBar()
+	sidebarRight := w.sidebarShown && w.settings.SidebarPosition == "right"
+	left, right = 14, 12
+	if !w.sidebarShown || sidebarRight {
+		left = bar.Left + 8
+	}
+	if !sidebarRight {
+		right += bar.Right
+	}
+	return
 }
 
 // chip is a label in a pill, as the branch.
@@ -274,7 +287,11 @@ func (w *window) mainArea(c *ui.Context, pal *palette) bool {
 			}
 		})
 	case w.loadErr != nil:
-		emptyPanel(c, pal, "Unable to read repository", errorText(w.loadErr), nil)
+		emptyPanel(c, pal, "Unable to determine review range", errorText(w.loadErr), func() {
+			if w.source.kind == sourceFeature {
+				ui.Button(c, "Choose range…").OnClick(func() { w.featureRangeOpen = true })
+			}
+		})
 	case slow:
 		thinking(c, w.loadStatus)
 	case waiting && len(w.files) == 0:
@@ -422,12 +439,12 @@ func (v *welcome) view(c *ui.Context) {
 	bar := c.TitleBar()
 	ui.Box(c).Height(max(bar.Height, 40)).DragWindow().FillWidth()
 	title := "Open a Git repository"
-	detail := "Run godiff from a Git repository in Terminal, or choose File → Open Folder… to open one."
+	detail := "Choose a Git repository to review a feature branch."
 	if v.err != nil && !errors.Is(v.err, git.ErrNotRepository) {
 		title, detail = "Unable to read repository", errorText(v.err)
 	} else if v.err != nil {
 		title = "No Git repository found"
-		detail = "Godiff was opened outside a Git repository. Run godiff from inside a repository, or choose File → Open Folder… to open one."
+		detail = "Choose a Git repository to review a feature branch."
 	}
 	emptyPanel(c, pal, title, detail, func() {
 		if ui.PrimaryButton(c, "Open Folder…").Clicked() {

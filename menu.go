@@ -3,8 +3,8 @@ package main
 import (
 	"runtime"
 
-	"github.com/jinghaihan/sift/internal/agent"
 	"github.com/egoist/mygo"
+	"github.com/jinghaihan/sift/internal/agent"
 )
 
 // focused returns the review window with the focus, nil for none.

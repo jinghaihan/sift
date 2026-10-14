@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jinghaihan/sift/internal/agent"
 	"github.com/egoist/mygo/ui"
+	"github.com/jinghaihan/sift/internal/agent"
 )
 
 // analysisState is an agent's review of a source: the one it gave, or the

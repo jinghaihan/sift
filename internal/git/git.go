@@ -127,7 +127,7 @@ func run(ctx context.Context, dir string, stdin io.Reader, args ...string) ([]by
 }
 
 // debug logs every git command with how long it took.
-var debug = os.Getenv("GODIFF_DEBUG") != ""
+var debug = os.Getenv("SIFT_DEBUG") != ""
 
 // Git runs git in the repository and returns what it printed.
 func (r *Repo) Git(args ...string) ([]byte, error) {

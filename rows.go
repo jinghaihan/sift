@@ -1,11 +1,11 @@
 package main
 
 import (
+	"github.com/egoist/mygo/ui"
 	"github.com/jinghaihan/sift/internal/diff"
 	"github.com/jinghaihan/sift/internal/fileicon"
 	"github.com/jinghaihan/sift/internal/github"
 	"github.com/jinghaihan/sift/internal/highlight"
-	"github.com/egoist/mygo/ui"
 )
 
 // fileState is a changed file as the review shows it: its change, the

@@ -1,11 +1,10 @@
-// Godiff is a native, minimal, local diff viewer for reviewing Git changes
-// and committing them, after codiff, drawn by MyGo.
+// Sift reviews complete feature contributions using Godiff's native interface.
 //
-//	godiff                 the uncommitted changes of the repository here
-//	godiff <path>          those of another repository
-//	godiff <commit>        a commit, as HEAD~1 or a1b2c3d
-//	godiff <branch>        the work tree's changes since it branched off
-//	godiff --pr <number>   a pull request on GitHub, as owner/repo#123 or
+//	sift                 the current feature branch of the repository here
+//	sift <path>          those of another repository
+//	sift <commit>        a commit, as HEAD~1 or a1b2c3d
+//	sift <branch>        the complete contribution of a feature branch
+//	sift --pr <number>   a pull request on GitHub, as owner/repo#123 or
 //	                       its URL too
 package main
 
@@ -22,22 +21,22 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jinghaihan/sift/internal/git"
-	"github.com/jinghaihan/sift/internal/github"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"github.com/jinghaihan/sift/internal/git"
+	"github.com/jinghaihan/sift/internal/github"
 )
 
-const usage = `Usage: godiff [<commit> | <branch> | <pull request>] [<path>]
+const usage = `Usage: sift [<commit> | <branch> | <pull request>] [<path>]
 
-Review the uncommitted changes of the Git repository at <path> (default:
-the current directory), a commit, the work tree's changes since it
-branched off <branch>, or a pull request on GitHub, named as
-owner/repo#123 or by its URL.
+Review the complete feature branch of the Git repository at <path> (default:
+the current directory), excluding changes imported from integration branches.
+The integration branch and first feature commit are detected automatically.
+You can also review a commit or a GitHub pull request.
 
 Options:
   --commit <ref>   review a commit
-  --branch <ref>   compare the work tree with a branch
+  --branch <ref>   review the complete feature branch
   --pr <number>    review a pull request of the repository's GitHub remote
   --cwd <dir>      the directory relative paths start from
   -h, --help       show this help
@@ -174,7 +173,7 @@ func showWelcome(err error) {
 	}
 	v := &welcome{err: err}
 	welcomeWin = mygo.NewWindow(mygo.WindowOptions{
-		Title:         "Godiff",
+		Title:         "Sift",
 		Width:         640,
 		Height:        420,
 		MinWidth:      480,
@@ -216,15 +215,15 @@ func main() {
 		return
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "godiff:", err)
+		fmt.Fprintln(os.Stderr, "sift:", err)
 		os.Exit(2)
 	}
 	// The command line names a repository, unless the app was started from
 	// Finder or the Dock, in /, or by `mygo dev`, in its project.
 	fromUser := len(args) > 0 || dir != wd || (wd != "/" && wd != "" && os.Getenv("MYGO_ENV") != "development")
 
-	name := "Godiff"
-	if n := os.Getenv("GODIFF_NAME"); n != "" {
+	name := "Sift"
+	if n := os.Getenv("SIFT_NAME"); n != "" {
 		// Another name runs apart from the installed app, for testing.
 		name = n
 	}
@@ -239,7 +238,7 @@ func main() {
 		args, workingDir = takeCwd(args, workingDir)
 		req, err := parseArgs(args, workingDir)
 		if err != nil {
-			go mygo.Dialog.Error("Godiff", err.Error())
+			go mygo.Dialog.Error("Sift", err.Error())
 			return
 		}
 		go open(req, true)
@@ -268,7 +267,7 @@ func main() {
 			go open(request{dir: wd}, false)
 		}
 	})
-	if path := os.Getenv("GODIFF_CPUPROFILE"); path != "" {
+	if path := os.Getenv("SIFT_CPUPROFILE"); path != "" {
 		// The whole session, written as the app quits.
 		if f, err := os.Create(path); err == nil {
 			pprof.StartCPUProfile(f)
@@ -278,7 +277,7 @@ func main() {
 			})
 		}
 	}
-	if path := os.Getenv("GODIFF_STARTUP_PROFILE"); path != "" {
+	if path := os.Getenv("SIFT_STARTUP_PROFILE"); path != "" {
 		// The first seconds, which draw the window for the first time.
 		if f, err := os.Create(path); err == nil {
 			pprof.StartCPUProfile(f)
