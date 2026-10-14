@@ -108,8 +108,9 @@ type window struct {
 	filter               string
 	filterFocus          bool
 	exclusionsOpen       bool
-	exclusionDrafts      []*exclusionDraft
-	exclusionNextID      int
+	exclusionsText       string
+	exclusionsFocus      bool
+	exclusionsError      string
 	exclusionMatchers    []pathGlob
 	exclusionPaths       map[string]bool
 	fileFiltersDirty     bool
@@ -404,6 +405,7 @@ func newWindow(repo *git.Repo, src source) *window {
 	w.list.Key = func(i int) any { return w.key(&w.rows[i]) }
 	w.list.Header = func(i int) bool { return w.rows[i].kind == rowHeader }
 	w.compileFileExclusions()
+	w.exclusionsText = formatFileExclusions(w.settings.FileExclusions)
 	return w
 }
 
@@ -439,6 +441,8 @@ func (w *window) applySettings(s Settings) {
 	old := w.settings
 	w.settings = s
 	if !slices.Equal(old.FileExclusions, s.FileExclusions) {
+		w.exclusionsText = formatFileExclusions(s.FileExclusions)
+		w.exclusionsError = ""
 		w.compileFileExclusions()
 		w.revealedExcludedPath = ""
 		w.fileFiltersDirty = true

@@ -288,6 +288,9 @@ func (w *window) sidebar(c *ui.Context) {
 					})
 					w.fileExclusionsButton(c, pal)
 				})
+				if w.exclusionsOpen {
+					w.fileExclusionsInput(c)
+				}
 			case 1:
 				searchInput(c, &w.historyFilter, "Filter history", &w.filterFocus, &w.typing)
 			default:

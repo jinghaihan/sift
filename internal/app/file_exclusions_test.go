@@ -91,56 +91,47 @@ func showsFile(w *window, path string) bool {
 	return slices.ContainsFunc(w.rows, func(r row) bool { return r.kind == rowHeader && w.files[r.file].Path == path })
 }
 
-func TestFileExclusionsEditToggleAndDeleteImmediately(t *testing.T) {
+func TestFileExclusionsEditInlineImmediately(t *testing.T) {
 	w, tt := newFileExclusionReview(t)
 	patch := w.featureResult.Patch
 	if w.hiddenFileCount() != 2 || showsFile(w, "README.md") || showsFile(w, "docs/guide.md") {
 		t.Fatal("default rule did not hide root and nested Markdown files")
 	}
-	if tt.HasText("README.md") {
-		t.Fatal("excluded file remained in the file tree")
-	}
 	if err := tt.Click("File exclusions"); err != nil {
 		t.Fatal(err)
 	}
-	snapshot(t, tt, "file-exclusions")
-	if tt.HasText("Apply") || tt.HasText("Cancel") || tt.HasText("Show all files temporarily") {
-		t.Fatal("manual apply controls or removed visibility feature remained")
+	input, ok := tt.Find("Files to exclude")
+	search, _ := tt.Find("Filter files")
+	if !ok || input.Y <= search.Y || input.X > search.X || input.X < 8 || input.W < search.W {
+		t.Fatalf("exclusion input is not below the file search: input=%+v search=%+v", input, search)
 	}
-	add, _ := tt.Find("Add exclusion rule")
-	input, _ := tt.Find("Exclude pattern 1")
-	if add.W < input.W {
-		t.Fatal("Add rule does not span the popover")
+	if tt.HasText("Apply") || tt.HasText("Cancel") || tt.HasText("Add rule") || tt.HasText("Show all files temporarily") {
+		t.Fatal("old popover controls remained")
 	}
-	tt.Click("Enable rule 1")
-	if !showsFile(w, "README.md") || w.hiddenFileCount() != 0 || cfg.Get().FileExclusions[0].Enabled {
-		t.Fatal("disabling a rule did not take effect immediately")
-	}
-	tt.Click("Enable rule 1")
-	tt.Click("Exclude pattern 1")
+	tt.Click("Files to exclude")
 	tt.Command("selectAll")
-	tt.Type("**/*.map")
-	if !showsFile(w, "README.md") || showsFile(w, "notes.map") || cfg.Get().FileExclusions[0].Pattern != "**/*.map" {
-		t.Fatal("editing the rule did not apply and save")
+	tt.Type("*.md, *.map, src/generated/**")
+	if showsFile(w, "README.md") || showsFile(w, "notes.map") || showsFile(w, "src/generated/index.ts") || len(cfg.Get().FileExclusions) != 3 {
+		t.Fatal("comma-separated exclusions did not apply and save immediately")
 	}
-	tt.Click("Enable rule 1")
-	tt.Click("Add rule")
-	tt.Click("Exclude pattern 2")
-	tt.Type("[")
-	if !w.exclusionsOpen || !tt.HasText("Invalid glob pattern.") || len(cfg.Get().FileExclusions) != 1 {
-		t.Fatal("invalid rule was saved or its error was hidden")
+	snapshot(t, tt, "file-exclusions-inline")
+	tt.Click("File exclusions")
+	if _, ok := tt.Find("Files to exclude"); ok || w.hiddenFileCount() != 4 {
+		t.Fatal("collapsing the field disabled filtering or left the input visible")
 	}
+	tt.Click("File exclusions")
+	if w.exclusionsText != "*.md, *.map, src/generated/**" {
+		t.Fatal("reopening changed the input")
+	}
+	tt.Click("Files to exclude")
 	tt.Command("selectAll")
-	tt.Click("Exclude pattern 2")
-	tt.Command("selectAll")
-	tt.Type("src/generated/**")
-	if !showsFile(w, "notes.map") || showsFile(w, "src/generated/index.ts") || w.settings.FileExclusions[0].Enabled {
-		t.Fatal("disabled rules or custom directory rules did not apply")
+	tt.Type("*.md, [")
+	if w.exclusionsError == "" || len(cfg.Get().FileExclusions) != 1 || showsFile(w, "README.md") {
+		t.Fatal("invalid draft was saved or prevented valid patterns from applying")
 	}
-	tt.Click("Delete rule 1")
-	tt.Click("Delete rule 1")
+	tt.Click("Clear exclusions")
 	if len(cfg.Get().FileExclusions) != 0 || w.hiddenFileCount() != 0 || !showsFile(w, "src/generated/index.ts") {
-		t.Fatal("clearing rules left files hidden")
+		t.Fatal("clearing the field left files hidden")
 	}
 	if w.featureResult.Patch != patch {
 		t.Fatal("display rules changed the computed feature diff")
@@ -148,7 +139,25 @@ func TestFileExclusionsEditToggleAndDeleteImmediately(t *testing.T) {
 	cfg.flushFileExclusions()
 	reloaded := &config{path: cfg.path, settings: defaultSettings()}
 	if !reloaded.load() || len(reloaded.Get().FileExclusions) != 0 {
-		t.Fatal("live deletion did not persist after restart")
+		t.Fatal("cleared exclusions did not persist after restart")
+	}
+}
+
+func TestCommaSeparatedExclusionsKeepLiteralCommas(t *testing.T) {
+	rules, invalid := parseFileExclusions(` *.md, , report\,old.txt, file[,]name, src/generated/** `)
+	want := []fileExclusion{{"*.md", true}, {`report\,old.txt`, true}, {"file[,]name", true}, {"src/generated/**", true}}
+	if invalid != "" || !slices.Equal(rules, want) {
+		t.Fatalf("parsed %+v, error %q", rules, invalid)
+	}
+	for _, pattern := range rules[1:3] {
+		glob, err := compilePathGlob(pattern.Pattern)
+		name := "report,old.txt"
+		if pattern.Pattern == "file[,]name" {
+			name = "file,name"
+		}
+		if err != nil || !glob.matches(name) {
+			t.Fatalf("literal comma failed: %+v, %v", pattern, err)
+		}
 	}
 }
 
@@ -171,8 +180,9 @@ func TestExcludedCommentCanRevealOnlyItsFile(t *testing.T) {
 	if err := tt.Click("File exclusions"); err != nil {
 		t.Fatal(err)
 	}
-	tt.Click("Enable rule 1")
-	tt.Click("Enable rule 1")
+	tt.Click("Clear exclusions")
+	tt.Click("Files to exclude")
+	tt.Type("*.md")
 	if showsFile(w, "README.md") || len(w.comments) != 1 {
 		t.Fatal("hiding the revealed file deleted its comment")
 	}
@@ -183,7 +193,7 @@ func TestExcludedCommentCanRevealOnlyItsFile(t *testing.T) {
 	}
 }
 
-func TestAllExcludedFilesCanBeRecoveredByDisablingRule(t *testing.T) {
+func TestAllExcludedFilesCanBeRecoveredByClearingInput(t *testing.T) {
 	w, tt := newFileExclusionReview(t)
 	s := w.settings
 	s.FileExclusions = []fileExclusion{{Pattern: "**", Enabled: true}}
@@ -198,9 +208,9 @@ func TestAllExcludedFilesCanBeRecoveredByDisablingRule(t *testing.T) {
 	if err := tt.Click("File exclusions"); err != nil {
 		t.Fatal(err)
 	}
-	tt.Click("Enable rule 1")
+	tt.Click("Clear exclusions")
 	if !showsFile(w, "README.md") || w.hiddenFileCount() != 0 {
-		t.Fatal("disabling the rule did not recover the diff")
+		t.Fatal("clearing the input did not recover the diff")
 	}
 }
 
