@@ -31,6 +31,9 @@ func (w *window) view(c *ui.Context) {
 	t := c.Theme()
 	pal := paletteFor(t)
 	w.now = c.Now()
+	if w.fileFiltersDirty {
+		w.refreshFileFilters()
+	}
 	if w.regroupPending {
 		w.regroupPending = false
 		w.regroup()
@@ -335,7 +338,14 @@ func (w *window) mainArea(c *ui.Context, pal *palette) bool {
 			if detail == "" {
 				detail = "Whitespace-only changes hidden"
 			}
-			emptyPanel(c, pal, title, detail, nil)
+			if w.hiddenFileCount() > 0 && w.filter == "" && !w.searching() {
+				title, detail = "All files are hidden", "Change file exclusions or show all files."
+				emptyPanel(c, pal, title, detail, func() {
+					ui.Button(c, "Show all files").OnClick(func() { w.showAllFiles = true; w.fileFiltersDirty = true })
+				})
+			} else {
+				emptyPanel(c, pal, title, detail, nil)
+			}
 			return false
 		}
 		w.diffList(c)

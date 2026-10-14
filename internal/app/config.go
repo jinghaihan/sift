@@ -31,13 +31,14 @@ type Settings struct {
 	// providers, as the AI Review card chooses it; empty for its own
 	// default, which for OpenCode is the one its own interface starts
 	// with.
-	AIAgent              string `json:"aiAgent"`
-	AIModel              string `json:"aiModel"`
-	ReviewCommentsPrefix string `json:"reviewCommentsPrefix"`
-	SidebarPosition      string `json:"sidebarPosition"` // left or right
-	ShowWhitespace       bool   `json:"showWhitespace"`
-	Theme                string `json:"theme"` // system, light or dark
-	WordWrap             bool   `json:"wordWrap"`
+	AIAgent              string          `json:"aiAgent"`
+	AIModel              string          `json:"aiModel"`
+	ReviewCommentsPrefix string          `json:"reviewCommentsPrefix"`
+	SidebarPosition      string          `json:"sidebarPosition"` // left or right
+	ShowWhitespace       bool            `json:"showWhitespace"`
+	Theme                string          `json:"theme"` // system, light or dark
+	WordWrap             bool            `json:"wordWrap"`
+	FileExclusions       []fileExclusion `json:"fileExclusions"`
 }
 
 func defaultSettings() Settings {
@@ -48,11 +49,19 @@ func defaultSettings() Settings {
 		ReviewCommentsPrefix: "# Address these Review Comments",
 		SidebarPosition:      "left",
 		Theme:                "system",
+		FileExclusions:       []fileExclusion{{Pattern: "*.md", Enabled: true}},
 	}
 }
 
 // normalize keeps the settings within what they may be.
 func (s *Settings) normalize() {
+	s.FileExclusions = slices.Clone(s.FileExclusions)
+	if s.FileExclusions == nil {
+		s.FileExclusions = []fileExclusion{}
+	}
+	for i := range s.FileExclusions {
+		s.FileExclusions[i].Pattern = strings.TrimSpace(s.FileExclusions[i].Pattern)
+	}
 	d := defaultSettings()
 	s.CodeFontFamily = strings.TrimSpace(s.CodeFontFamily)
 	if s.CodeFontSize == 0 {
@@ -101,7 +110,9 @@ func newConfig() *config {
 func (c *config) Get() Settings {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.settings
+	s := c.settings
+	s.FileExclusions = slices.Clone(s.FileExclusions)
+	return s
 }
 
 // Update changes the settings and writes them.

@@ -61,7 +61,7 @@ func (w *window) updateMatches() {
 	}
 	filter := strings.TrimSpace(w.filter)
 	for fi, f := range w.files {
-		if !w.hasContent(f) || !fuzzyMatch(f.Path, filter) {
+		if !w.hasContent(f) || !w.fileAllowed(f.Path) || !fuzzyMatch(f.Path, filter) {
 			continue
 		}
 		found := false

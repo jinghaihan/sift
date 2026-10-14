@@ -37,6 +37,12 @@ When Git history does not identify the range reliably, Sift asks for the integra
 
 Reviews leave the repository's current branch, working files, and index untouched.
 
+## File exclusions
+
+Use the filter button beside the file search to edit exclusion rules. Markdown files are hidden initially by `*.md`; change, disable, or delete this rule to include them. Patterns without `/` match file names in any directory; patterns with `/` match paths relative to the repository. Rules apply to all repositories and are saved in the user settings. Clearing every rule keeps all files included after restarting.
+
+The filter button is highlighted while exclusions are active; hover to see the hidden-file count. **Show all files temporarily** reveals files without changing the saved rules. Exclusions affect the file tree and displayed diff; comments are retained, and opening a comment temporarily reveals its file.
+
 ## Review comments
 
 Click a code line or select a range to write a comment. Comments are saved automatically. Open the comments panel in the toolbar to browse your notes and use Previous or Next to walk through them during a review. Comments whose code can no longer be found remain available under Location changed.

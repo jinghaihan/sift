@@ -53,6 +53,9 @@ func fuzzyMatch(s, query string) bool {
 // while finding, holds a match.
 func (w *window) fileVisible(i int) bool {
 	f := w.files[i]
+	if !w.fileAllowed(f.Path) {
+		return false
+	}
 	if !w.hasContent(f) {
 		return false
 	}
@@ -275,11 +278,16 @@ func (w *window) sidebar(c *ui.Context) {
 		ui.Column(c).Padding(2, 10, 8).Children(func() {
 			switch w.tab {
 			case 0:
-				if searchInput(c, &w.filter, "Filter files", &w.filterFocus, &w.typing) {
-					w.matchesFor = "\x00"
-					w.buildTree()
-					w.rowsDirty = true
-				}
+				ui.Row(c).Gap(4).Children(func() {
+					ui.Column(c).Grow(1).MinWidth(0).Children(func() {
+						if searchInput(c, &w.filter, "Filter files", &w.filterFocus, &w.typing) {
+							w.matchesFor = "\x00"
+							w.buildTree()
+							w.rowsDirty = true
+						}
+					})
+					w.fileExclusionsButton(c, pal)
+				})
 			case 1:
 				searchInput(c, &w.historyFilter, "Filter history", &w.filterFocus, &w.typing)
 			default:
@@ -438,6 +446,8 @@ func (w *window) fileTree(c *ui.Context) {
 				msg = "Loading…"
 			case strings.TrimSpace(w.filter) != "":
 				msg = "No matching files"
+			case w.hiddenFileCount() > 0:
+				msg = "All files are hidden"
 			}
 			ui.Text(c, msg).FontSize(12).TextColor(t.TextMuted)
 		})
@@ -825,7 +835,11 @@ func (w *window) sidebarFooter(c *ui.Context, pal *palette) {
 	ui.Row(c).MinHeight(40).Padding(6, 10).Gap(8).BorderWidth(1, 0, 0, 0).BorderColor(pal.cardBorder).Children(func() {
 		if counted && w.tab == 0 {
 			ui.Row(c).Gap(6).Tooltip("Total change: " + lines(adds, "added") + ", " + lines(dels, "removed")).Children(func() {
-				ui.Text(c, "Total:").FontSize(11).FontWeight(600).TextColor(t.TextMuted)
+				label := "Total:"
+				if w.hiddenFileCount() > 0 {
+					label = "Visible:"
+				}
+				ui.Text(c, label).FontSize(11).FontWeight(600).TextColor(t.TextMuted)
 				ui.Text(c, "+"+thousands(adds)).Font(w.codeFont()).FontSize(11).FontWeight(600).TextColor(pal.addText)
 				ui.Text(c, "-"+thousands(dels)).Font(w.codeFont()).FontSize(11).FontWeight(600).TextColor(pal.delText)
 			})

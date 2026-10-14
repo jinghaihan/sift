@@ -83,6 +83,10 @@ func (w *window) revealComment(cm *comment) {
 		return
 	}
 	w.filter, w.finding = "", false
+	if !w.fileAllowed(cm.path) {
+		w.revealedExcludedPath = cm.path
+		w.refreshFileFilters()
+	}
 	w.buildTree()
 	f := w.files[fi]
 	f.collapsed = false

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -101,22 +102,30 @@ type window struct {
 	loadStatus string
 
 	// The sidebar.
-	sidebarShown bool
-	sidebarWidth float32
-	tab          int // 0 files, 1 history
-	filter       string
-	filterFocus  bool
-	treeList     ui.ListState
-	treeSel      string // the key of the row chosen
-	treeRows     []treeRow
-	closedDirs   map[string]bool
-	treeItems    map[string]*treeNode
-	treeRoots    []string
-	history      []git.Commit
-	historyLimit int
-	historyMore  bool
-	historyList  ui.ListState
-	commitTimes  map[string]commitTime
+	sidebarShown         bool
+	sidebarWidth         float32
+	tab                  int // 0 files, 1 history
+	filter               string
+	filterFocus          bool
+	exclusionsOpen       bool
+	exclusionDrafts      []*exclusionDraft
+	exclusionNextID      int
+	exclusionMatchers    []pathGlob
+	exclusionPaths       map[string]bool
+	fileFiltersDirty     bool
+	showAllFiles         bool
+	revealedExcludedPath string
+	treeList             ui.ListState
+	treeSel              string // the key of the row chosen
+	treeRows             []treeRow
+	closedDirs           map[string]bool
+	treeItems            map[string]*treeNode
+	treeRoots            []string
+	history              []git.Commit
+	historyLimit         int
+	historyMore          bool
+	historyList          ui.ListState
+	commitTimes          map[string]commitTime
 	// historyFilter filters the History tab, apart from the files'.
 	historyFilter  string
 	historyLoading bool
@@ -395,6 +404,7 @@ func newWindow(repo *git.Repo, src source) *window {
 	w.dragWidth = w.sidebarWidth
 	w.list.Key = func(i int) any { return w.key(&w.rows[i]) }
 	w.list.Header = func(i int) bool { return w.rows[i].kind == rowHeader }
+	w.compileFileExclusions()
 	return w
 }
 
@@ -424,6 +434,11 @@ func shortHash(h string) string {
 func (w *window) applySettings(s Settings) {
 	old := w.settings
 	w.settings = s
+	if !slices.Equal(old.FileExclusions, s.FileExclusions) {
+		w.compileFileExclusions()
+		w.revealedExcludedPath = ""
+		w.fileFiltersDirty = true
+	}
 	if old.ShowWhitespace != s.ShowWhitespace {
 		w.load()
 	}
@@ -519,6 +534,10 @@ func (w *window) setSource(src source) {
 // switchTo makes a source the one shown, its review in place of the
 // other's.
 func (w *window) switchTo(src source) {
+	w.exclusionsOpen = false
+	w.showAllFiles = false
+	w.revealedExcludedPath = ""
+	w.fileFiltersDirty = true
 	w.saveFeatureReview()
 	// Each source keeps its review: the comments, and what was viewed of a
 	// commit.
