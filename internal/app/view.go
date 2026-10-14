@@ -49,7 +49,7 @@ func (w *window) view(c *ui.Context) {
 		}
 		ui.Column(c).Grow(1).MinWidth(0).Background(pal.appBg).Children(func() {
 			w.toolbar(c, pal)
-			ui.Row(c).Grow(1).MinHeight(0).Children(func() {
+			ui.Row(c).Grow(1).MinHeight(0).AlignItems(ui.Stretch).Children(func() {
 				ui.Column(c).Grow(1).MinWidth(0).Disabled(w.loading && w.isFeatureReview()).Children(func() {
 					reviewBuilt = w.mainArea(c, pal)
 				})
