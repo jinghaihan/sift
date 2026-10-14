@@ -310,17 +310,15 @@ func TestPullRequestReadOnly(t *testing.T) {
 	f := &fakeGitHub{base: base, head: head, comments: `[]`}
 	f.serve(t)
 	withSettings(t, func(s *Settings) { s.GithubToken = "" })
-	t.Setenv("SIFT_NO_SHELL_PATH", "1")
-	t.Setenv("PATH", t.TempDir()) // no gh
-	for _, k := range []string{"SIFT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"} {
-		t.Setenv(k, "")
-	}
+	// Model a signed-out result without clearing PATH: Git for Windows
+	// needs its runtime environment to fetch through transport helpers.
 	token.Lock()
-	token.at = time.Time{}
+	previousValue, previousTime := token.value, token.at
+	token.value, token.at = "", time.Now()
 	token.Unlock()
 	t.Cleanup(func() {
 		token.Lock()
-		token.at = time.Time{}
+		token.value, token.at = previousValue, previousTime
 		token.Unlock()
 	})
 
