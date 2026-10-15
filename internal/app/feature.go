@@ -74,8 +74,11 @@ func (w *window) loadFeature() {
 				}
 			}
 			if err == nil {
+				database, record, err = reviewstore.Open(directory, scope)
+			}
+			if err == nil {
 				var value review.Result
-				value, err = review.Analyze(ctx, review.Options{Scope: scope, KeepSnapshot: true, OnProgress: func(message string) {
+				value, err = review.Analyze(ctx, review.Options{Scope: scope, KnownCommits: record.Provenance, KeepSnapshot: true, OnProgress: func(message string) {
 					w.update(func() {
 						if !w.stale(gen) {
 							w.loadStatus = message
@@ -109,11 +112,18 @@ func (w *window) loadFeature() {
 			if src.kind == sourceHistorical {
 				scope.Branch += "::historical:" + src.ref
 			}
-			database, record, err = reviewstore.Open(directory, scope)
+			if database == nil || record.Scope != scope {
+				database, record, err = reviewstore.Open(directory, scope)
+			}
 			if err == nil {
 				record.Tip = result.Tip
 				if src.kind == sourceFeature {
+					record.Provenance = result.Provenance
 					err = reviewstore.SaveScope(directory, result.Scope)
+					if err == nil {
+						record.Sequence++
+						err = database.Save(record)
+					}
 				}
 			}
 		}

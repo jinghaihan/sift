@@ -39,14 +39,16 @@ type Comment struct {
 }
 
 type Record struct {
-	Scope    review.Scope      `json:"scope"`
-	Tip      string            `json:"tip"`
-	Sequence uint64            `json:"sequence"`
-	Comments []Comment         `json:"comments"`
-	Viewed   map[string]string `json:"viewed"`
+	Scope      review.Scope              `json:"scope"`
+	Tip        string                    `json:"tip"`
+	Sequence   uint64                    `json:"sequence"`
+	Comments   []Comment                 `json:"comments"`
+	Viewed     map[string]string         `json:"viewed"`
+	Provenance []review.CommitProvenance `json:"provenance,omitempty"`
 }
 
 func (r Record) Clone() Record {
+	r.Provenance = slices.Clone(r.Provenance)
 	r.Comments = slices.Clone(r.Comments)
 	r.Viewed = maps.Clone(r.Viewed)
 	return r

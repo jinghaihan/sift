@@ -35,6 +35,8 @@ go run ./cmd/sift --branch feature/my-change /path/to/repository
 
 The branch picker includes local and fetched remote-tracking branches, such as `origin/feature/my-change`, and reloads its choices each time you open it. Fetch in your Git client to update the remote records before reviewing.
 
+Local branch operation records and saved commit provenance retain feature work after it is merged or fast-forwarded into the integration branch. Recorded synchronization points keep unrelated development out of the review, including when another branch contains the same feature commits.
+
 When Git history does not identify the range reliably, choose the integration branch from a searchable list, then search the commit messages and select the first feature commit. The selected commit is included in the review; the range extends to the branch's latest commit and is remembered for that branch.
 
 Reviews leave the repository's current branch, working files, and index untouched.

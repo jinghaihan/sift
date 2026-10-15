@@ -17,7 +17,9 @@ func TestPersistenceAndLateSaves(t *testing.T) {
 		t.Fatal(err)
 	}
 	record.Comments = append(record.Comments, NewComment("feature:x.go", "x.go", "Please check this.", Anchor{Side: 1, Start: 4, End: 4, Excerpt: "call()"}))
+	record.Provenance = []review.CommitProvenance{{ID: "commit", Role: "feature"}}
 	old := record.Clone()
+	old.Provenance[0].ID = "old"
 	record.Sequence = 2
 	record.Comments[0].Resolved = true
 	record.Viewed["feature:x.go"] = "fingerprint"
@@ -30,6 +32,9 @@ func TestPersistenceAndLateSaves(t *testing.T) {
 	_, loaded, err := Open(dir, scope)
 	if err != nil || len(loaded.Comments) != 1 || !loaded.Comments[0].Resolved || loaded.Viewed["feature:x.go"] != "fingerprint" {
 		t.Fatalf("lost the latest review: %+v, %v", loaded, err)
+	}
+	if len(loaded.Provenance) != 1 || loaded.Provenance[0].ID != "commit" {
+		t.Fatal("the saved feature provenance was lost or shared with a stale snapshot")
 	}
 	other := scope
 	other.Start = "another start"
