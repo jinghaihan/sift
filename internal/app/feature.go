@@ -382,13 +382,13 @@ func (w *window) featureToolbar(c *ui.Context, pal *palette) {
 		}
 		ui.Spacer(c)
 		if result := w.featureResult; result != nil && result.Branch == w.featureBranch && len(result.Uncertain) > 0 {
-			trigger := iconButton(c, iconAlert, fmt.Sprintf("%d historical conflict patches", len(result.Uncertain))).TextColor(t.Warning).OnClick(func() {
+			iconButton(c, iconAlert, fmt.Sprintf("%d historical conflict patches", len(result.Uncertain))).TextColor(t.Warning).OnClick(func() {
 				if !w.featureHistoryOpen {
 					w.historicalQuery = ""
+					w.historicalRow = 0
 				}
 				w.featureHistoryOpen = !w.featureHistoryOpen
 			})
-			w.featureHistoryPopover(c, trigger)
 		}
 		iconButton(c, iconSearch, "Find in diffs (⌘F)").OnClick(func() { w.finding = !w.finding })
 		wrap := iconButton(c, iconWrap, "Toggle word wrap (⌥Z)").OnClick(func() { w.settings.WordWrap = !w.settings.WordWrap; w.rowsDirty = true })

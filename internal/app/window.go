@@ -65,6 +65,8 @@ type window struct {
 	branchRefreshErr                                        error
 	historicalQuery                                         string
 	historicalList                                          ui.ListState
+	historicalRow                                           int
+	historicalPointer                                       [2]float32
 	reviewImport                                            *reviewImportState
 	reviewImportReading                                     bool
 	reviewFileError                                         string

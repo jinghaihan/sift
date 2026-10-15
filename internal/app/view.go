@@ -69,6 +69,7 @@ func (w *window) view(c *ui.Context) {
 	})
 	w.shortcuts(c, reviewBuilt)
 	w.palette(c)
+	w.featureHistoryPalette(c)
 	w.sourceDialog(c)
 	w.shortcutsHelp(c)
 	w.reviewDialog(c)
@@ -312,12 +313,8 @@ func (w *window) mainArea(c *ui.Context, pal *palette) bool {
 		ui.Box(c).Grow(1)
 	case len(w.files) == 0:
 		if w.source.kind == sourceFeature && w.featureResult != nil && len(w.featureResult.Uncertain) > 0 {
-			detail := "1 historical patch"
-			if count := len(w.featureResult.Uncertain); count > 1 {
-				detail = fmt.Sprintf("%d historical patches", count)
-			}
-			emptyPanel(c, pal, "Changes need conflict review", detail, func() {
-				ui.Button(c, "View changes").OnClick(func() { w.setSource(source{kind: sourceHistorical, ref: w.featureResult.Uncertain[0].Commit}) })
+			ui.Column(c).Grow(1).Center().Padding(24).Children(func() {
+				ui.Text(c, "Review historical changes from the warning menu above.").FontSize(13).TextColor(c.Theme().TextMuted)
 			})
 			break
 		}
@@ -431,7 +428,7 @@ func (w *window) shortcuts(c *ui.Context, reviewBuilt bool) {
 	// had the focus in the last frame.
 	typing := w.typing
 	w.typing = false
-	if w.commitOpen || w.paletteOpen || w.dialogOpen || w.help || typing || !reviewBuilt || (w.pr != nil && w.pr.submitOpen) {
+	if w.commitOpen || w.paletteOpen || w.featureHistoryOpen || w.dialogOpen || w.help || typing || !reviewBuilt || (w.pr != nil && w.pr.submitOpen) {
 		return
 	}
 	if c.Shortcut(0, ui.KeyJ) || c.Shortcut(ui.Ctrl, ui.KeyDown) {

@@ -74,7 +74,7 @@ func TestFeatureBranchSearchAndLongListScrolling(t *testing.T) {
 	}
 }
 
-func TestHistoricalChangesPopoverUsesToolbarAnchor(t *testing.T) {
+func TestHistoricalChangesUseCommandPaletteStyle(t *testing.T) {
 	w := newWindow(&git.Repo{Root: t.TempDir()}, source{kind: sourceFeature, ref: "feature"})
 	w.featureBranch, w.hold = "feature", true
 	w.featureResult = &review.Result{Scope: review.Scope{Branch: "feature"}}
@@ -84,24 +84,25 @@ func TestHistoricalChangesPopoverUsesToolbarAnchor(t *testing.T) {
 		})
 	}
 	tt := ui.NewTester(w.view, 1280, 860)
-	trigger, _ := tt.Find("30 historical conflict patches")
 	if err := tt.Click("30 historical conflict patches"); err != nil {
 		t.Fatal(err)
 	}
-	heading, ok := tt.Find("Historical changes")
-	if !ok || heading.Y < trigger.Y+trigger.H || heading.Y > trigger.Y+trigger.H+40 {
-		t.Fatalf("history did not open beneath the toolbar trigger: %+v, %+v", trigger, heading)
+	panel, ok := tt.Find("Historical changes picker")
+	if !ok || panel.W != 560 || panel.X != (1280-panel.W)/2 || panel.Y != 120 {
+		t.Fatalf("history did not reuse the centered command palette surface: %+v", panel)
 	}
-	list, ok := tt.Find("Historical patches")
+	if !tt.Focused("Search historical changes") {
+		t.Fatal("history search did not receive keyboard focus")
+	}
+	list, ok := tt.Find("Historical changes picker choices")
 	if !ok || list.Y+list.H > 580 {
 		t.Fatalf("historical list is not bounded: %+v", list)
 	}
-	panel, ok := tt.Find("Historical changes popover")
-	if !ok || panel.X+panel.W-(list.X+list.W) != 1 {
+	if panel.X+panel.W-(list.X+list.W) != 1 {
 		t.Fatalf("historical scrollbar is inset from the panel edge: panel=%+v list=%+v", panel, list)
 	}
 	tt.Move(list.X+list.W-4, list.Y+40)
-	snapshot(t, tt, "historical-scrollbar")
+	snapshot(t, tt, "historical-palette-scrollbar")
 	tt.Scroll(list.X+20, list.Y+40, 0, 2000)
 	last := w.featureResult.Uncertain[29]
 	if _, ok := tt.Find("Historical patch " + last.Commit); !ok {
@@ -114,11 +115,51 @@ func TestHistoricalChangesPopoverUsesToolbarAnchor(t *testing.T) {
 	if !tt.HasText(last.Subject) || tt.HasText("Feature change 00") {
 		t.Fatal("historical search did not filter patches")
 	}
-	snapshot(t, tt, "historical-popover")
-	if err := tt.Click("Historical patch " + last.Commit); err != nil {
+	snapshot(t, tt, "historical-palette-search")
+	tt.Key(0, ui.KeyEnter)
+	if w.featureHistoryOpen || w.source.kind != sourceHistorical || w.source.ref != last.Commit {
+		t.Fatal("choosing a historical patch did not close the picker and open its diff")
+	}
+}
+
+func TestHistoricalPaletteKeyboardNavigationAndEscape(t *testing.T) {
+	w := newWindow(&git.Repo{Root: t.TempDir()}, source{kind: sourceFeature, ref: "feature"})
+	w.featureBranch, w.hold = "feature", true
+	w.featureResult = &review.Result{Scope: review.Scope{Branch: "feature"}, Uncertain: []review.Uncertain{
+		{Commit: strings.Repeat("a", 40), Subject: "Same subject", Reason: "Merge resolution"},
+		{Commit: strings.Repeat("b", 40), Subject: "Same subject", Reason: "Overlapping changes"},
+	}}
+	tt := ui.NewTester(w.view, 1280, 860)
+	if err := tt.Click("2 historical conflict patches"); err != nil {
 		t.Fatal(err)
 	}
-	if w.featureHistoryOpen || w.source.kind != sourceHistorical || w.source.ref != last.Commit {
-		t.Fatal("choosing a historical patch did not close the popover and open its diff")
+	tt.Key(0, ui.KeyDown)
+	if w.historicalRow != 1 {
+		t.Fatal("Down did not select the next historical patch")
+	}
+	tt.Key(0, ui.KeyUp)
+	if w.historicalRow != 0 {
+		t.Fatal("Up did not select the previous historical patch")
+	}
+	tt.Key(0, ui.KeyEscape)
+	if w.featureHistoryOpen || w.source.kind != sourceFeature {
+		t.Fatal("Escape did not dismiss the picker without changing the review")
+	}
+	if err := tt.Click("2 historical conflict patches"); err != nil {
+		t.Fatal(err)
+	}
+	w.paletteOpen = true
+	tt.Frame()
+	if w.featureHistoryOpen {
+		t.Fatal("command bar stacked a second modal over historical changes")
+	}
+	tt.Key(0, ui.KeyEscape)
+	if err := tt.Click("2 historical conflict patches"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Key(0, ui.KeyDown)
+	tt.Key(0, ui.KeyEnter)
+	if w.featureHistoryOpen || w.source.ref != strings.Repeat("b", 40) {
+		t.Fatal("keyboard selection opened the wrong patch with a duplicate subject")
 	}
 }

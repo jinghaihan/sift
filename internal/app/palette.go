@@ -11,6 +11,8 @@ import (
 
 // command is an action of the command bar.
 type command struct {
+	id    string // stable key when titles are not unique
+	label string // accessible label when it differs from the title
 	title string
 	hint  string // a description, or the shortcut
 	keys  string
@@ -161,8 +163,7 @@ func (w *window) palette(c *ui.Context) {
 		w.paletteQuery = ""
 		return
 	}
-	t := c.Theme()
-	pal := paletteFor(t)
+	w.featureHistoryOpen = false
 	q := strings.TrimSpace(w.paletteQuery)
 	var cmds []command
 	for _, cmd := range w.commands() {
@@ -170,96 +171,12 @@ func (w *window) palette(c *ui.Context) {
 			cmds = append(cmds, cmd)
 		}
 	}
-	if w.paletteRow >= len(cmds) {
-		w.paletteRow = len(cmds) - 1
-	}
-	if w.paletteRow < 0 && len(cmds) > 0 {
-		w.paletteRow = 0
-	}
-	run := func(i int) {
-		if i < 0 || i >= len(cmds) {
-			return
-		}
-		w.paletteOpen = false
-		w.paletteQuery = ""
-		cmds[i].run()
-	}
-	ui.DialogBase(c, &w.paletteOpen, func(backdrop, panel ui.Element) {
-		backdrop.Background(ui.RGBA(0, 0, 0, 0.12)).Justify(ui.Start).Padding(120, 0, 0, 0)
-		panel.Width(560).MaxHeight(440).Radius(16).Background(pal.headerBg).Border(1, pal.cardBorder).
-			Shadow(0, 20, 60, 0, ui.RGBA(0, 0, 0, 0.28)).Clip().Label("Command bar")
-		ui.Row(c).Padding(10, 14).Gap(10).BorderWidth(0, 0, 1, 0).BorderColor(pal.cardBorder).Children(func() {
-			ui.Icon(c, iconCommand).FontSize(16).TextColor(t.TextMuted)
-			input := ui.TextInputBase(c, &w.paletteQuery).Placeholder("Type a command…").Label("Command").FontSize(15).Grow(1).AutoFocus()
-			if input.Changed() {
-				w.paletteRow = 0
-			}
-			if input.Shortcut(0, ui.KeyDown) && len(cmds) > 0 {
-				w.paletteRow = (w.paletteRow + 1) % len(cmds)
-				w.paletteList.ScrollIntoView(w.paletteRow)
-			}
-			if input.Shortcut(0, ui.KeyUp) && len(cmds) > 0 {
-				w.paletteRow = (w.paletteRow - 1 + len(cmds)) % len(cmds)
-				w.paletteList.ScrollIntoView(w.paletteRow)
-			}
-			if input.Submitted() {
-				run(w.paletteRow)
-			}
-		})
-		w.paletteList.Key = func(i int) any { return cmds[i].title }
-		ui.List(c, &w.paletteList, len(cmds), func(i int) {
-			cmd := cmds[i]
-			item := ui.Row(c).MinHeight(34).Padding(6, 10).Gap(8).Radius(8).Cursor(ui.CursorPointer)
-			if item.Hovered() && w.paletteMoved(item) {
-				w.paletteRow = i
-			}
-			if i == w.paletteRow {
-				item.Background(t.Accent).TextColor(t.AccentText)
-			}
-			if item.Clicked() {
-				run(i)
-			}
-			item.Children(func() {
-				ui.Text(c, cmd.title).FontSize(13).Shrink(0)
-				if cmd.hint != "" {
-					hint := ui.Text(c, cmd.hint).FontSize(12).SingleLine().Shrink(1).MinWidth(0)
-					if i != w.paletteRow {
-						hint.TextColor(t.TextMuted)
-					} else {
-						hint.Opacity(0.8)
-					}
-				}
-				ui.Spacer(c)
-				if cmd.keys != "" {
-					k := ui.Text(c, cmd.keys).FontSize(11).Padding(2, 6).Radius(5).Shrink(0)
-					if i == w.paletteRow {
-						k.Background(ui.RGBA(255, 255, 255, 0.2))
-					} else {
-						k.Background(pal.pill).TextColor(t.TextMuted)
-					}
-				}
-			})
-		}).Padding(6).MaxHeight(380).Children(func() {
-			if len(cmds) == 0 {
-				ui.Text(c, "No matching commands").FontSize(13).TextColor(t.TextMuted).Padding(12)
-			}
-		})
+	commandPalette(c, paletteView{
+		open: &w.paletteOpen, query: &w.paletteQuery, row: &w.paletteRow,
+		list: &w.paletteList, pointer: &w.palettePointer,
+		label: "Command bar", inputLabel: "Command", placeholder: "Type a command…",
+		icon: iconCommand, items: cmds,
 	})
-	if !w.paletteOpen {
-		w.paletteQuery = ""
-	}
-}
-
-// paletteMoved reports whether the pointer moved over an item, so that a
-// list scrolled under a still pointer keeps the row the keys chose.
-func (w *window) paletteMoved(e ui.Element) bool {
-	x, y, over := e.PointerPosition()
-	if !over {
-		return false
-	}
-	moved := x != w.palettePointer[0] || y != w.palettePointer[1]
-	w.palettePointer = [2]float32{x, y}
-	return moved
 }
 
 // dialogKind is what the open dialog asks for.
