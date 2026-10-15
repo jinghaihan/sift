@@ -21,6 +21,7 @@ type Scope struct {
 
 type Options struct {
 	Scope
+	KnownCommits []CommitProvenance
 	OnProgress   func(string)
 	KeepSnapshot bool
 }
@@ -36,14 +37,15 @@ type Uncertain struct {
 
 type Result struct {
 	Scope
-	Tip          string      `json:"tip"`
-	Commits      int         `json:"commits"`
-	Merges       int         `json:"merges"`
-	Imported     int         `json:"imported"`
-	Patch        string      `json:"patch"`
-	Uncertain    []Uncertain `json:"uncertain,omitempty"`
-	SnapshotPath string      `json:"-"`
-	Baseline     string      `json:"-"`
+	Provenance   []CommitProvenance `json:"provenance,omitempty"`
+	Tip          string             `json:"tip"`
+	Commits      int                `json:"commits"`
+	Merges       int                `json:"merges"`
+	Imported     int                `json:"imported"`
+	Patch        string             `json:"patch"`
+	Uncertain    []Uncertain        `json:"uncertain,omitempty"`
+	SnapshotPath string             `json:"-"`
+	Baseline     string             `json:"-"`
 }
 
 // Close releases a retained comparison snapshot after its viewer closes.
@@ -85,14 +87,30 @@ func Analyze(ctx context.Context, options Options) (Result, error) {
 	for id := range strings.FieldsSeq(backgroundHistory) {
 		imported[id] = true
 	}
-	if imported[start] {
-		return result, fmt.Errorf("%w: the integration branch's mainline already contains the first feature commit; select an integration revision before that fast-forward", ErrInvalidScope)
-	}
 	history, err := History(ctx, r.path, result.Tip)
 	if err != nil {
 		return result, err
 	}
-	history, err = featureHistory(history, start, imported)
+	evidence := recordedFeature(ctx, r, options.Branch, options.Integration, history)
+	reachable := map[string]bool{}
+	for _, commit := range history {
+		reachable[commit.ID] = true
+	}
+	for _, known := range options.KnownCommits {
+		if known.Role == integrationUpdate && reachable[known.ID] && reachable[known.Previous] && evidence.previous[known.ID] == "" {
+			evidence.previous[known.ID] = known.Previous
+		}
+		if reachable[known.ID] && (known.Role == featureCommit || known.Role == integrationMerge || known.Role == featureMerge) {
+			if evidence.roles[known.ID] == "" {
+				evidence.roles[known.ID] = known.Role
+			}
+		}
+	}
+	applyFeatureEvidence(imported, evidence.roles)
+	if imported[start] {
+		return result, fmt.Errorf("%w: the first feature commit is already on the integration mainline and its branch provenance is unavailable", ErrInvalidScope)
+	}
+	history, err = featureHistory(history, start, imported, evidence.previous)
 	if err != nil {
 		return result, fmt.Errorf("%w: %v", ErrInvalidScope, err)
 	}
@@ -141,9 +159,20 @@ func Analyze(ctx context.Context, options Options) (Result, error) {
 		}
 		progress(fmt.Sprintf("Isolating feature changes %d/%d · %s", i+1, len(history), commit.ShortID()))
 		if imported[commit.ID] {
+			if previous := evidence.previous[commit.ID]; previous != "" {
+				result.Provenance = append(result.Provenance, CommitProvenance{ID: commit.ID, Role: integrationUpdate, Previous: previous})
+			}
 			result.Imported++
 			continue
 		}
+		role := evidence.roles[commit.ID]
+		if role == "" {
+			role = featureCommit
+			if len(commit.Parents) > 1 {
+				role = integrationMerge
+			}
+		}
+		result.Provenance = append(result.Provenance, CommitProvenance{ID: commit.ID, Role: role})
 		if len(commit.Parents) > 1 {
 			result.Merges++
 			if len(commit.Parents) > 2 {
@@ -156,11 +185,19 @@ func Analyze(ctx context.Context, options Options) (Result, error) {
 			if strings.Contains(patch, "diff --git ") {
 				result.Uncertain = append(result.Uncertain, Uncertain{Commit: commit.ID, Subject: commit.Subject, Reason: "Merge resolution · historical changes", Patch: patch})
 			}
-			continue
+			if role != featureMerge {
+				continue
+			}
 		}
 
-		result.Commits++
-		if _, revertErr := work.run(ctx, "revert", "--no-commit", commit.ID); revertErr != nil {
+		args := []string{"revert", "--no-commit"}
+		if len(commit.Parents) > 1 {
+			args = append(args, "--mainline", "1")
+		} else {
+			result.Commits++
+		}
+		args = append(args, commit.ID)
+		if _, revertErr := work.run(ctx, args...); revertErr != nil {
 			unmerged, listErr := work.run(ctx, "ls-files", "--unmerged", "-z")
 			if listErr != nil {
 				return result, listErr

@@ -103,10 +103,10 @@ func History(ctx context.Context, path, branch string) ([]Commit, error) {
 	return commits, nil
 }
 
-// featureHistory follows the feature mainline through integration merges that
-// were fast-forwarded back into the feature. Their feature-side parent retains
-// the earlier work; following only first parents would lose it.
-func featureHistory(history []Commit, start string, imported map[string]bool) ([]Commit, error) {
+// featureHistory follows first parents and recorded integration updates.
+// Shared commits need an update record: mere reachability cannot distinguish
+// a returned feature from someone else's branch containing the same commits.
+func featureHistory(history []Commit, start string, imported map[string]bool, previous map[string]string) ([]Commit, error) {
 	byID := make(map[string]Commit, len(history))
 	for _, commit := range history {
 		byID[commit.ID] = commit
@@ -128,21 +128,35 @@ func featureHistory(history []Commit, start string, imported map[string]bool) ([
 		if commit.ID == start {
 			return result, nil
 		}
-		next := ""
 		if imported[commit.ID] {
-			for _, parent := range commit.Parents {
-				if !imported[parent] && contains[parent] {
-					next = parent
-					break
+			if old := previous[commit.ID]; old != "" {
+				if !contains[old] || !hasAncestor(byID, commit.ID, old) || old == commit.ID {
+					return nil, fmt.Errorf("invalid recorded integration update at %s", commit.ShortID())
 				}
+				commit = byID[old]
+				continue
 			}
+			return nil, fmt.Errorf("cannot classify shared commit %s without the branch's synchronization record", commit.ShortID())
 		}
-		if next == "" && len(commit.Parents) > 0 && contains[commit.Parents[0]] {
-			next = commit.Parents[0]
-		}
-		if next == "" {
+		if len(commit.Parents) == 0 || !contains[commit.Parents[0]] {
 			return nil, fmt.Errorf("cannot trace the feature mainline through %s; select its actual first feature commit", commit.ShortID())
 		}
-		commit = byID[next]
+		commit = byID[commit.Parents[0]]
 	}
+}
+
+func hasAncestor(byID map[string]Commit, tip, ancestor string) bool {
+	queue, seen := []string{tip}, map[string]bool{}
+	for len(queue) > 0 {
+		id := queue[len(queue)-1]
+		queue = queue[:len(queue)-1]
+		if id == ancestor {
+			return true
+		}
+		if !seen[id] {
+			seen[id] = true
+			queue = append(queue, byID[id].Parents...)
+		}
+	}
+	return false
 }

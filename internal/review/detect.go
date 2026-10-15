@@ -112,22 +112,29 @@ func DetectScope(ctx context.Context, path, branch string) (Scope, error) {
 	}
 	background := candidates[chosen]
 	scope.Integration = background.name
+	evidence := recordedFeature(ctx, r, branch, scope.Integration, history)
+	applyFeatureEvidence(background.mainline, evidence.roles)
+	// A recorded local commit directly after a recorded fork identifies the
+	// first feature commit even if later merges moved the fork off dev's
+	// current first-parent line. A tracking checkout is not such a fork.
+	if evidence.fork {
+		for _, commit := range history {
+			if evidence.roles[commit.ID] != "" && len(commit.Parents) > 0 && commit.Parents[0] == evidence.base {
+				if _, traceErr := featureHistory(history, commit.ID, background.mainline, evidence.previous); traceErr == nil {
+					scope.Start = commit.ID
+					return scope, nil
+				}
+			}
+		}
+	}
 	// A local creation reflog gives the original fork even after a merged
 	// integration branch was fast-forwarded back. Ignore tracking-clone
 	// creation entries whose tip is not on the integration mainline.
-	if output, logErr := r.run(ctx, "reflog", "show", "--format=%H%x00%gs", branch, "--"); logErr == nil {
-		for line := range strings.SplitSeq(output, "\n") {
-			base, message, ok := strings.Cut(line, "\x00")
-			if !ok || !strings.HasPrefix(message, "branch: Created from ") || !background.mainline[base] {
-				continue
-			}
-			if base == tip {
-				return scope, ErrNoFeatureChanges
-			}
-			path, pathErr := featureHistory(history, base, background.mainline)
-			if pathErr != nil {
-				continue
-			}
+	if base := evidence.base; base != "" && background.mainline[base] {
+		if evidence.fork && base == tip {
+			return scope, ErrNoFeatureChanges
+		}
+		if path, pathErr := featureHistory(history, base, background.mainline, evidence.previous); pathErr == nil {
 			for i := len(path) - 2; i >= 0; i-- {
 				if !background.mainline[path[i].ID] {
 					scope.Start = path[i].ID
@@ -136,6 +143,7 @@ func DetectScope(ctx context.Context, path, branch string) (Scope, error) {
 			}
 		}
 	}
+
 	var first string
 	for commit := byID[tip]; commit.ID != ""; {
 		if background.mainline[commit.ID] {
