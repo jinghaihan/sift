@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+
+	"github.com/jinghaihan/sift/internal/review"
 )
 
 const maxReviewBytes = 32 << 20
@@ -15,12 +17,14 @@ const maxReviewBytes = 32 << 20
 // ReviewFile is a portable review. Local repository paths and save sequencing
 // belong to Record and are deliberately not part of this format.
 type ReviewFile struct {
-	Format     string           `json:"format"`
-	Version    int              `json:"version"`
-	Repository ReviewRepository `json:"repository"`
-	Scope      ReviewScope      `json:"scope"`
-	Revision   string           `json:"revision"`
-	Comments   []Comment        `json:"comments"`
+	Format     string                    `json:"format"`
+	Version    int                       `json:"version"`
+	Repository ReviewRepository          `json:"repository"`
+	Scope      ReviewScope               `json:"scope"`
+	Revision   string                    `json:"revision"`
+	Comments   []Comment                 `json:"comments"`
+	Provenance []review.CommitProvenance `json:"provenance,omitempty"`
+	Script     []ScriptSection           `json:"script,omitempty"`
 }
 
 type ReviewRepository struct {
@@ -38,10 +42,11 @@ type ReviewScope struct {
 func ExportReview(record Record, name, remote string) ReviewFile {
 	branch, historical, _ := strings.Cut(record.Scope.Branch, "::historical:")
 	return ReviewFile{
-		Format: "sift-review", Version: 1,
+		Format: "sift-review", Version: 2,
 		Repository: ReviewRepository{Name: name, Remote: RepositoryRemote(remote)},
 		Scope:      ReviewScope{Branch: branch, Integration: record.Scope.Integration, Start: record.Scope.Start, Historical: historical},
 		Revision:   record.Tip, Comments: slices.Clone(record.Comments),
+		Provenance: slices.Clone(record.Provenance), Script: CloneScript(record.Script),
 	}
 }
 
@@ -77,8 +82,27 @@ func ReadReview(r io.Reader) (ReviewFile, error) {
 }
 
 func (file ReviewFile) Validate() error {
-	if file.Format != "sift-review" || file.Version != 1 {
+	if file.Format != "sift-review" || (file.Version != 1 && file.Version != 2) {
 		return fmt.Errorf("unsupported review file format or version")
+	}
+	if err := ValidateScript(file.Script); err != nil {
+		return err
+	}
+	proofs := map[string]bool{}
+	for _, proof := range file.Provenance {
+		if !commitID(proof.ID) || proofs[proof.ID] {
+			return fmt.Errorf("review has invalid or duplicate provenance")
+		}
+		proofs[proof.ID] = true
+		switch proof.Role {
+		case "feature", "feature_merge", "integration_merge":
+		case "integration_update":
+			if !commitID(proof.Previous) {
+				return fmt.Errorf("integration update lacks its previous position")
+			}
+		default:
+			return fmt.Errorf("unknown provenance role %q", proof.Role)
+		}
 	}
 	if strings.TrimSpace(file.Scope.Branch) == "" || strings.TrimSpace(file.Scope.Integration) == "" || !commitID(file.Scope.Start) || !commitID(file.Revision) || file.Scope.Historical != "" && !commitID(file.Scope.Historical) {
 		return fmt.Errorf("review file has an invalid branch, range or revision")

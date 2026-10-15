@@ -183,3 +183,22 @@ func TestClearAllReviewCommentsRequiresConfirmationAndPersists(t *testing.T) {
 		t.Fatal("clearing comments hid the diff")
 	}
 }
+
+func TestNativeReviewPreservesHeadlessDraftOwnership(t *testing.T) {
+	w, _ := newFeatureReview(t)
+	w.addComment("main.go", sideNew, 6, 6)
+	w.comments[0].text = "Explain this in review."
+	w.comments[0].storeSource = "agent:review-bot"
+	w.saveFeatureReview()
+	w.comments = nil
+	w.restoreFeatureComments()
+	if len(w.comments) != 1 || w.comments[0].storeSource != "agent:review-bot" {
+		t.Fatal("restoring a CLI draft lost its owner")
+	}
+	w.comments[0].text = "Edited in the native review."
+	w.saveFeatureReview()
+	_, saved, err := reviewstore.Open(filepath.Dir(cfg.path), w.featureRecord.Scope)
+	if err != nil || saved.Comments[0].Source != "agent:review-bot" || saved.Comments[0].Body != w.comments[0].text {
+		t.Fatalf("editing a CLI draft removed its stable ownership: %+v %v", saved, err)
+	}
+}

@@ -32,6 +32,10 @@ func mergeRecord(base, incoming, latest Record) (Record, error) {
 	if err != nil {
 		return latest, err
 	}
+	result.Script, err = mergeScript(base.Script, incoming.Script, latest.Script)
+	if err != nil {
+		return latest, err
+	}
 	for key, value := range incoming.Viewed {
 		if value == base.Viewed[key] {
 			continue

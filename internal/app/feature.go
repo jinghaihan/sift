@@ -257,7 +257,7 @@ func (w *window) restoreFeatureComments() {
 		if anchor.Side == 0 {
 			sd = sideOld
 		}
-		w.comments = append(w.comments, &comment{id: commentIDs, path: saved.Path, side: sd, start: anchor.Start, line: anchor.End, text: saved.Body, storeID: saved.ID, outdated: outdated, anchor: saved.Anchor, created: saved.Created, resolved: saved.Resolved})
+		w.comments = append(w.comments, &comment{id: commentIDs, path: saved.Path, side: sd, start: anchor.Start, line: anchor.End, text: saved.Body, storeID: saved.ID, storeSource: saved.Source, outdated: outdated, anchor: saved.Anchor, created: saved.Created, resolved: saved.Resolved})
 	}
 }
 
@@ -325,6 +325,7 @@ func (w *window) featureRecordSnapshot() reviewstore.Record {
 		}
 		value.Created, value.Resolved = cm.created, cm.resolved
 		value.Outdated = cm.outdated
+		value.Source = cm.storeSource
 		record.Comments = append(record.Comments, value)
 	}
 	return record

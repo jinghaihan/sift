@@ -36,6 +36,7 @@ type Comment struct {
 	Resolved bool      `json:"resolved"`
 	Outdated bool      `json:"outdated"`
 	Created  time.Time `json:"created"`
+	Source   string    `json:"source,omitempty"`
 }
 
 type Record struct {
@@ -45,9 +46,11 @@ type Record struct {
 	Comments   []Comment                 `json:"comments"`
 	Viewed     map[string]string         `json:"viewed"`
 	Provenance []review.CommitProvenance `json:"provenance,omitempty"`
+	Script     []ScriptSection           `json:"script,omitempty"`
 }
 
 func (r Record) Clone() Record {
+	r.Script = CloneScript(r.Script)
 	r.Provenance = slices.Clone(r.Provenance)
 	r.Comments = slices.Clone(r.Comments)
 	r.Viewed = maps.Clone(r.Viewed)

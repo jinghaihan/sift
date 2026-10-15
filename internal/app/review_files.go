@@ -148,6 +148,26 @@ func (w *window) applyReviewImport() {
 		replace[conflict.Imported.ID] = conflict.choice == "Use imported"
 	}
 	local.Comments = reviewstore.MergeComments(local.Comments, state.file.Comments, replace)
+	for _, proof := range state.file.Provenance {
+		found := false
+		for _, current := range local.Provenance {
+			found = found || current.ID == proof.ID
+		}
+		if !found {
+			local.Provenance = append(local.Provenance, proof)
+		}
+	}
+	// Preserve sections from portable reviews while the script editor is being
+	// connected. Existing local sections win ID collisions, like local notes.
+	for _, section := range reviewstore.CloneScript(state.file.Script) {
+		found := false
+		for _, current := range local.Script {
+			found = found || current.ID == section.ID
+		}
+		if !found {
+			local.Script = append(local.Script, section)
+		}
+	}
 	w.featureRecord = local
 	w.comments = nil
 	w.restoreFeatureComments()

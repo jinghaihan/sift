@@ -21,19 +21,20 @@ const (
 // comment is a review comment on a line, or a range of lines of one side,
 // anchored on its last line.
 type comment struct {
-	storeID    string
-	outdated   bool
-	anchor     reviewstore.Anchor
-	created    time.Time
-	resolved   bool
-	id         int
-	path       string
-	side       side
-	start      int // the first line of the range
-	line       int // the last line, where it shows
-	text       string
-	focus      bool // takes the focus as it is built
-	wasFocused bool
+	storeID     string
+	storeSource string
+	outdated    bool
+	anchor      reviewstore.Anchor
+	created     time.Time
+	resolved    bool
+	id          int
+	path        string
+	side        side
+	start       int // the first line of the range
+	line        int // the last line, where it shows
+	text        string
+	focus       bool // takes the focus as it is built
+	wasFocused  bool
 	// posting is set while the comment goes to GitHub, postErr when it
 	// could not.
 	posting bool
