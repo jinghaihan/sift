@@ -670,6 +670,9 @@ func blend(base, over ui.Color) ui.Color { return over.Over(base) }
 // commentRow shows a comment, under the line it is on.
 func (w *window) commentRow(c *ui.Context, pal *palette, f *fileState, cm *comment) {
 	t := c.Theme()
+	_, height := c.Size()
+	// Include the header, borders and padding in the one-third-window limit.
+	maxLines := max(1, int((height/3-66)/20))
 	w.card(c, pal).Padding(8, 16).Gap(10).AlignItems(ui.Start).Children(func() {
 		ui.Avatar(c, w.userName(), nil).Size(28, 28).Shrink(0)
 		box := ui.Column(c).Grow(1).MinWidth(0).Radius(12).Border(1, pal.cardBorder).Background(pal.headerBg).Clip()
@@ -682,7 +685,7 @@ func (w *window) commentRow(c *ui.Context, pal *palette, f *fileState, cm *comme
 					w.deleteComment(cm)
 				}
 			})
-			area := ui.TextAreaBase(c, &cm.text).Placeholder("Write a review comment…").MinHeight(64).Padding(8, 10).
+			area := ui.TextAreaBase(c, &cm.text).Placeholder("Write a review comment…").Lines(1, maxLines).FixedLineHeight(20).Padding(8, 10).
 				FontSize(13).Label("Review comment").OnChange(w.saveFeatureReview)
 			if cm.focus {
 				area.Focus()
