@@ -68,6 +68,12 @@ func TestHistoricalChangesPopoverUsesToolbarAnchor(t *testing.T) {
 	if !ok || list.Y+list.H > 580 {
 		t.Fatalf("historical list is not bounded: %+v", list)
 	}
+	panel, ok := tt.Find("Historical changes popover")
+	if !ok || panel.X+panel.W-(list.X+list.W) != 1 {
+		t.Fatalf("historical scrollbar is inset from the panel edge: panel=%+v list=%+v", panel, list)
+	}
+	tt.Move(list.X+list.W-4, list.Y+40)
+	snapshot(t, tt, "historical-scrollbar")
 	tt.Scroll(list.X+20, list.Y+40, 0, 2000)
 	last := w.featureResult.Uncertain[29]
 	if _, ok := tt.Find("Historical patch " + last.Commit); !ok {

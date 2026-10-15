@@ -12,16 +12,18 @@ func (w *window) featureHistoryPopover(c *ui.Context, trigger ui.Element) {
 		t := c.Theme()
 		width, height := c.Size()
 		panel.AttachTo(trigger, ui.AnchorBottomRight, ui.AnchorTopRight).Margin(6, 0, 0, 0).
-			Width(min(620, width-24)).MaxHeight(min(480, height-80)).Padding(14).Gap(8).
-			Background(paletteFor(t).headerBg).Radius(10).Border(1, t.Border).Shadow(0, 6, 20, 0, ui.RGBA(0, 0, 0, 0.15))
-		ui.Row(c).Gap(8).Children(func() {
-			ui.Text(c, "Historical changes").FontSize(13).Bold().Grow(1)
-			iconButton(c, iconClose, "Close historical changes").OnClick(func() { w.featureHistoryOpen = false })
+			Width(min(620, width-24)).MaxHeight(min(480, height-80)).Padding(0).Gap(0).
+			Background(paletteFor(t).headerBg).Radius(10).Border(1, t.Border).Shadow(0, 6, 20, 0, ui.RGBA(0, 0, 0, 0.15)).Label("Historical changes popover")
+		ui.Column(c).Padding(14, 14, 8).Gap(8).FillWidth().Children(func() {
+			ui.Row(c).Gap(8).Children(func() {
+				ui.Text(c, "Historical changes").FontSize(13).Bold().Grow(1)
+				iconButton(c, iconClose, "Close historical changes").OnClick(func() { w.featureHistoryOpen = false })
+			})
+			search := ui.SearchField(c, &w.historicalQuery).Label("Search historical changes").FillWidth()
+			if search.FocusWithin() {
+				w.typing = true
+			}
 		})
-		search := ui.SearchField(c, &w.historicalQuery).Label("Search historical changes").FillWidth()
-		if search.FocusWithin() {
-			w.typing = true
-		}
 		var items []review.Uncertain
 		query := strings.TrimSpace(w.historicalQuery)
 		for _, item := range w.featureResult.Uncertain {
@@ -30,7 +32,7 @@ func (w *window) featureHistoryPopover(c *ui.Context, trigger ui.Element) {
 			}
 		}
 		if len(items) == 0 {
-			ui.Text(c, "No matching changes.").FontSize(12).TextColor(t.TextMuted).Padding(8)
+			ui.Text(c, "No matching changes.").FontSize(12).TextColor(t.TextMuted).Padding(8, 22, 22)
 			return
 		}
 		ui.List(c, &w.historicalList, len(items), func(i int) {
@@ -49,6 +51,6 @@ func (w *window) featureHistoryPopover(c *ui.Context, trigger ui.Element) {
 					ui.Text(c, item.Reason).FontSize(11).TextColor(t.Warning).SingleLine().FillWidth()
 				})
 			})
-		}).Height(min(320, height-180, float32(len(items))*54)).FillWidth().Label("Historical patches")
+		}).Height(min(320, height-180, float32(len(items))*54)+14).Padding(0, 14, 14).FillWidth().Label("Historical patches")
 	})
 }
