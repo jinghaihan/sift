@@ -57,10 +57,9 @@ type session struct {
 
 // window is a window reviewing a repository.
 type window struct {
-	branchQuery                                             string
-	branchQueryFor                                          string
-	branchHighlight                                         string
-	branchPickerOpen                                        bool
+	branchChoice                                            string
+	branchChoiceFor                                         string
+	branchPickerFocused                                     bool
 	branchRefreshGen                                        uint64
 	branchRefreshErr                                        error
 	historicalQuery                                         string

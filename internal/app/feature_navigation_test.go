@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -37,15 +38,18 @@ func TestFeatureBranchPickerReloadsRefsOnEachOpen(t *testing.T) {
 }
 
 func TestFeatureBranchSearchAndLongListScrolling(t *testing.T) {
-	w := newWindow(&git.Repo{Root: t.TempDir()}, source{kind: sourceFeature, ref: "feature"})
+	w := newWindow(&git.Repo{Root: filepath.Join(t.TempDir(), "example")}, source{kind: sourceFeature, ref: "feature"})
 	w.featureBranch, w.hold = "feature", true
+	w.loadErr = review.ErrNoFeatureChanges
 	for i := range 400 {
 		w.featureBranches = append(w.featureBranches, fmt.Sprintf("feature/%04d", i))
 	}
 	tt := ui.NewTester(w.view, 1280, 860)
+	snapshot(t, tt, "feature-empty-godiff")
 	if err := tt.Click("Feature branch"); err != nil {
 		t.Fatal(err)
 	}
+	snapshot(t, tt, "branch-builtin-open-godiff")
 	queued := len(w.held)
 	first, ok := tt.Find("feature/0000")
 	if !ok {
@@ -53,9 +57,9 @@ func TestFeatureBranchSearchAndLongListScrolling(t *testing.T) {
 	}
 	tt.Move(first.X+20, first.Y+10)
 	tt.Scroll(first.X+20, first.Y+10, 0, 20000)
-	snapshot(t, tt, "branch-scroll")
+	snapshot(t, tt, "branch-builtin-scroll")
 	last, ok := tt.Find("feature/0399")
-	if !ok || last.Y < 52 || last.Y+last.H > 400 {
+	if !ok || last.Y < 52 || last.Y+last.H > first.Y+280 {
 		t.Fatalf("last branch is not reachable inside a bounded popup: first=%+v last=%+v", first, last)
 	}
 	if w.featureBranch != "feature" || len(w.held) != queued {
@@ -67,7 +71,7 @@ func TestFeatureBranchSearchAndLongListScrolling(t *testing.T) {
 	if w.featureBranch != "feature" || len(w.held) != queued || !tt.HasText("feature/0399") {
 		t.Fatal("branch search changed the review before confirmation")
 	}
-	snapshot(t, tt, "branch-search")
+	snapshot(t, tt, "branch-builtin-search")
 	tt.Key(0, ui.KeyEnter)
 	if w.source.ref != "feature/0399" || len(w.held) != queued+1 {
 		t.Fatal("Enter did not select the matching branch")

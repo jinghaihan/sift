@@ -372,7 +372,7 @@ func (w *window) featureToolbar(c *ui.Context, pal *palette) {
 			ui.Text(c, filepath.Base(w.repo.Root)).FontSize(13).FontWeight(600).SingleLine()
 			ui.Icon(c, iconChevronDown).FontSize(12).TextColor(t.TextMuted)
 		})
-		w.featureBranchPicker(c, pal)
+		w.featureBranchPicker(c)
 		if w.source.kind == sourceHistorical {
 			iconButton(c, iconHouse, "Back to feature review").OnClick(func() { w.setSource(source{kind: sourceFeature, ref: w.featureBranch}) })
 			ui.Text(c, "Historical").FontSize(11).TextColor(t.Warning)
