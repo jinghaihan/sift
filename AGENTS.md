@@ -9,10 +9,14 @@ add a web frontend without a demonstrated native limitation.
   imported by integration-branch merges, including changes in the same file.
 - The normal flow selects a repository and feature branch in the header.
   Infer the integration branch and inclusive first feature commit from Git
-  history and usable creation reflogs; remember the scope. Only show a range
-  dialog when inference is ambiguous. Integration-mainline commits are background,
-  including fast-forwarded updates. Reject ambiguous scopes instead of leaking
-  unrelated changes.
+  history and usable creation reflogs; remember the scope. Offer inline branch
+  and commit choices only when inference is ambiguous. Integration updates are
+  background; feature commits remain feature work after they enter the integration
+  mainline. Follow recorded synchronization positions and persist commit provenance
+  with review records. Do not pick a merge parent merely because it contains the
+  feature start. Reject missing provenance instead of silently dropping shared
+  commits or leaking unrelated changes. A tracking checkout is not proof of an
+  empty feature or its original fork.
   Git commits do not record branch creation. Never guess a scope and silently include
   unrelated development. Remember the user's scope locally.
 - Use first-parent history to identify feature commits. Author filtering is not
