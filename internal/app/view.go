@@ -311,6 +311,16 @@ func (w *window) mainArea(c *ui.Context, pal *palette) bool {
 	case waiting && len(w.files) == 0:
 		ui.Box(c).Grow(1)
 	case len(w.files) == 0:
+		if w.source.kind == sourceFeature && w.featureResult != nil && len(w.featureResult.Uncertain) > 0 {
+			detail := "1 historical patch"
+			if count := len(w.featureResult.Uncertain); count > 1 {
+				detail = fmt.Sprintf("%d historical patches", count)
+			}
+			emptyPanel(c, pal, "Changes need conflict review", detail, func() {
+				ui.Button(c, "View changes").OnClick(func() { w.setSource(source{kind: sourceHistorical, ref: w.featureResult.Uncertain[0].Commit}) })
+			})
+			break
+		}
 		title, detail := "No local changes", abbreviateHome(w.repo.Root)
 		switch w.source.kind {
 		case sourceCommit:
