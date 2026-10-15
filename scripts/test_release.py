@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import json
 import os
 import shutil
@@ -102,7 +103,19 @@ class ReleaseTests(unittest.TestCase):
         for name in ("Sift 0.1.0.dmg", "Sift Setup 0.1.0 amd64.exe", "sift_0.1.0_amd64.deb", "install.sh"):
             (directory / name).write_bytes(b"package")
         release_assets.verify_assets(directory)
-        self.assertIn("Sift 0.1.0.dmg", (directory / "SHA256SUMS").read_text(encoding="utf-8"))
+        checksums = (directory / "SHA256SUMS").read_text(encoding="utf-8")
+        self.assertIn("Sift-0.1.0.dmg", checksums)
+        self.assertIn("Sift-Setup-0.1.0-amd64.exe", checksums)
+        self.assertFalse((directory / "Sift 0.1.0.dmg").exists())
+        self.assertFalse((directory / "Sift Setup 0.1.0 amd64.exe").exists())
+        release_assets.verify_assets(directory)
+        self.assertEqual((directory / "SHA256SUMS").read_text(encoding="utf-8"), checksums)
+        # Model GitHub's filename normalization: every checksum must still
+        # refer to the same bytes after upload and download.
+        for line in checksums.splitlines():
+            digest, name = line.split("  ", 1)
+            self.assertEqual(name, name.replace(" ", "."))
+            self.assertEqual(hashlib.sha256((directory / name).read_bytes()).hexdigest(), digest)
         (directory / "sift-0.1.0-windows-amd64.tar.gz").write_bytes(b"truncated")
         with self.assertRaises(ValueError):
             release_assets.verify_assets(directory)

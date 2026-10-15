@@ -43,7 +43,8 @@ The tag workflow:
    and Linux x64 archive and Debian package. MyGo also creates signed update
    archives, available delta updates and a manifest for each target.
 4. Embeds the same generated release notes in each update manifest.
-5. Checks installers, manifests, archive sizes and checksums. Creates a draft
+5. Normalizes installer filenames without spaces, then checks installers,
+   manifests, archive sizes and checksums. Creates a draft
    GitHub Release, uploads all files, downloads them to verify their checksums,
    then publishes the complete release as latest.
 

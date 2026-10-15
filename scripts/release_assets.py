@@ -81,7 +81,15 @@ def verify_assets(directory: Path, targets: tuple[str, ...] = TARGETS) -> None:
         "linux-amd64": f"sift_{version}_amd64.deb",
     }
     for target in targets:
-        file = directory / downloads[target]
+        original = directory / downloads[target]
+        file = directory / original.name.replace(" ", "-")
+        # GitHub changes spaces in uploaded asset names into dots. Rename
+        # installers before generating checksums so local and downloaded
+        # filenames agree. Accept normalized files when verification repeats.
+        if original != file and original.is_file():
+            if file.exists():
+                raise ValueError(f"duplicate installer: {file.name}")
+            original.rename(file)
         if not file.is_file() or not file.stat().st_size:
             raise ValueError(f"missing installer: {file.name}")
     if "linux-amd64" in targets and not (directory / "install.sh").is_file():
