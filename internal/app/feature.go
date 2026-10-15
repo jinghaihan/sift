@@ -184,7 +184,9 @@ func (w *window) loadFeature() {
 					f.loaded = true
 				}
 			}
-			w.restoreFeatureComments()
+			if w.restoreFeatureComments() > 0 {
+				w.saveFeatureReview()
+			}
 			w.loadedOnce, w.rowsDirty = true, true
 			w.buildTree()
 		})
@@ -218,14 +220,17 @@ func (w *window) featureContents(ctx context.Context, result *review.Result, fil
 	return values, nil
 }
 
-func (w *window) restoreFeatureComments() {
+// restoreFeatureComments relocates saved notes and counts notes whose code
+// no longer exists so the caller can persist their removal.
+func (w *window) restoreFeatureComments() int {
+	restored := 0
 	byPath := map[string]*fileState{}
 	for _, f := range w.files {
 		byPath[f.Path] = f
 	}
 	for _, saved := range w.featureRecord.Comments {
 		anchor := saved.Anchor
-		outdated := true
+		located := false
 		if f := byPath[saved.Path]; f != nil {
 			lines := map[int]string{}
 			text := f.newLines
@@ -249,16 +254,20 @@ func (w *window) restoreFeatureComments() {
 					}
 				}
 			}
-			anchor, outdated = reviewstore.Relocate(anchor, lines)
-			outdated = !outdated
+			anchor, located = reviewstore.Relocate(anchor, lines)
 		}
+		if !located {
+			continue
+		}
+		restored++
 		commentIDs++
 		sd := sideNew
 		if anchor.Side == 0 {
 			sd = sideOld
 		}
-		w.comments = append(w.comments, &comment{id: commentIDs, path: saved.Path, side: sd, start: anchor.Start, line: anchor.End, text: saved.Body, storeID: saved.ID, storeSource: saved.Source, outdated: outdated, anchor: saved.Anchor, created: saved.Created, resolved: saved.Resolved})
+		w.comments = append(w.comments, &comment{id: commentIDs, path: saved.Path, side: sd, start: anchor.Start, line: anchor.End, text: saved.Body, storeID: saved.ID, storeSource: saved.Source, created: saved.Created, resolved: saved.Resolved})
 	}
+	return len(w.featureRecord.Comments) - restored
 }
 
 func (w *window) featureRecordSnapshot() reviewstore.Record {
@@ -311,9 +320,6 @@ func (w *window) featureRecordSnapshot() reviewstore.Record {
 			break
 		}
 		anchor.Excerpt = strings.Join(lines, "\n")
-		if cm.outdated {
-			anchor = cm.anchor
-		}
 		value := reviewstore.NewComment(cm.path, cm.path, cm.text, anchor)
 		if cm.storeID == "" {
 			cm.storeID = value.ID
@@ -324,7 +330,6 @@ func (w *window) featureRecordSnapshot() reviewstore.Record {
 			cm.created = value.Created.UTC()
 		}
 		value.Created, value.Resolved = cm.created, cm.resolved
-		value.Outdated = cm.outdated
 		value.Source = cm.storeSource
 		record.Comments = append(record.Comments, value)
 	}

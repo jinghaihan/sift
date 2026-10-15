@@ -427,7 +427,7 @@ func (w *window) appendComments(rows []row, idx int32, f *fileState, l *diff.Lin
 		}
 	}
 	for _, cm := range w.comments {
-		if cm.path != f.Path || cm.outdated || w.placed[cm] {
+		if cm.path != f.Path || w.placed[cm] {
 			continue
 		}
 		// Unchanged lines take comments on either side.

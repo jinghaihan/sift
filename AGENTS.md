@@ -26,7 +26,9 @@ add a web frontend without a demonstrated native limitation.
 - Work in a temporary clone. Never checkout, reset, revert, stage, or commit in
   a reviewed repository. Preserve dirty working trees and the user's index.
 - Store review data outside repositories. Anchor comments to file, side, lines,
-  code context and revision. Detect stale comments after refresh.
+  code context and revision. Relocate comments by code context after refresh;
+  remove notes whose code cannot be located. Do not add a separate
+  outdated-comment interface.
 
 ## Structure
 

@@ -191,7 +191,7 @@ func TestExcludedCommentCanRevealOnlyItsFile(t *testing.T) {
 	}
 	w.load()
 	tt.Frame()
-	if len(w.comments) != 1 || w.comments[0].outdated {
+	if len(w.comments) != 1 {
 		t.Fatal("hidden comment did not survive refresh")
 	}
 }

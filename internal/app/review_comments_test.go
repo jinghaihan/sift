@@ -87,25 +87,43 @@ func TestReviewCommentsNavigateHiddenContext(t *testing.T) {
 	}
 }
 
-func TestMissingCommentRemainsReadableAndRetainsItsAnchor(t *testing.T) {
+func TestRefreshRemovesCommentsWhoseCodeCannotBeLocated(t *testing.T) {
 	w, tt := newFeatureReview(t)
-	saved := reviewstore.NewComment("removed.go", "removed.go", "Explain the earlier design.", reviewstore.Anchor{Side: 1, Start: 3, End: 3, Excerpt: "originalCall()"})
-	w.featureRecord.Comments = []reviewstore.Comment{saved}
-	w.restoreFeatureComments()
+	w.addComment("main.go", sideNew, 6, 6)
+	w.comments[0].text = "Keep this comment on code that still exists."
+	w.saveFeatureReview()
+	validID := w.comments[0].storeID
+	db, record, err := reviewstore.Open(filepath.Dir(cfg.path), w.featureRecord.Scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record.Comments = append(record.Comments,
+		reviewstore.NewComment("removed.go", "removed.go", "This file no longer exists.", reviewstore.Anchor{Side: 1, Start: 3, End: 3, Excerpt: "originalCall()"}),
+		reviewstore.NewComment("main.go", "main.go", "This code no longer exists.", reviewstore.Anchor{Side: 1, Start: 6, End: 6, Excerpt: "deletedCall()"}),
+	)
+	record.Sequence++
+	if err := db.Save(record); err != nil {
+		t.Fatal(err)
+	}
+	w.load()
 	tt.Frame()
+	if w.loadErr != nil || len(w.comments) != 1 || w.comments[0].storeID != validID {
+		t.Fatalf("refresh did not remove only unlocatable comments: %+v, %v", w.comments, w.loadErr)
+	}
+	_, saved, err := reviewstore.Open(filepath.Dir(cfg.path), w.featureRecord.Scope)
+	if err != nil || len(saved.Comments) != 1 || saved.Comments[0].ID != validID {
+		t.Fatalf("cleanup was not persisted: %+v, %v", saved, err)
+	}
 	if err := tt.Click("Review comments (1)"); err != nil {
 		t.Fatal(err)
 	}
-	if !w.comments[0].outdated || !tt.HasText("Location changed") {
-		t.Fatal("missing file's comment was not available")
+	if tt.HasText("Location changed") || tt.HasText("Original code") || tt.HasText("Outdated") {
+		t.Fatal("removed comments still have a separate interface")
 	}
-	if _, ok := tt.Find("Outdated review comment"); !ok {
-		t.Fatal("full outdated comment is not readable")
-	}
-	snapshot(t, tt, "outdated-review-comment")
-	w.saveFeatureReview()
-	if got := w.featureRecord.Comments[0]; got.Anchor != saved.Anchor || !got.Created.Equal(saved.Created) {
-		t.Fatal("saving an outdated comment changed its original anchor or creation time")
+	snapshot(t, tt, "review-comments-cleaned")
+	w.load()
+	if w.loadErr != nil || len(w.comments) != 1 || w.comments[0].storeID != validID {
+		t.Fatal("removed comments returned after reopening the review")
 	}
 }
 
@@ -135,9 +153,8 @@ func TestClearAllReviewCommentsRequiresConfirmationAndPersists(t *testing.T) {
 	w.addComment("main.go", sideNew, 6, 6)
 	w.comments[0].text = "A prepared review note."
 	w.saveFeatureReview()
-	w.featureRecord.Comments = append(w.featureRecord.Comments, reviewstore.NewComment("removed.go", "removed.go", "Keep this outdated note until cleared.", reviewstore.Anchor{Side: 1, Start: 3, End: 3, Excerpt: "oldCall()"}))
-	w.comments = nil
-	w.restoreFeatureComments()
+	w.addComment("long.txt", sideNew, 250, 250)
+	w.comments[1].text = "Another prepared review note."
 	w.setViewed(w.files[0], true)
 	w.saveFeatureReview()
 	otherScope := w.featureRecord.Scope

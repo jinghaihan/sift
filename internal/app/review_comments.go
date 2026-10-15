@@ -22,12 +22,6 @@ func (w *window) orderedComments() []*comment {
 		}
 	}
 	slices.SortStableFunc(list, func(a, b *comment) int {
-		if a.outdated != b.outdated {
-			if a.outdated {
-				return 1
-			}
-			return -1
-		}
 		if n := cmp.Compare(a.path, b.path); n != 0 {
 			return n
 		}
@@ -60,9 +54,6 @@ func (w *window) revealComment(cm *comment) {
 	list := w.orderedComments()
 	if at := slices.Index(list, cm); at >= 0 {
 		w.reviewCommentList.ScrollTo(at, ui.Center)
-	}
-	if cm.outdated {
-		return
 	}
 	fi := slices.IndexFunc(w.files, func(f *fileState) bool { return f.Path == cm.path })
 	if fi < 0 {
@@ -111,7 +102,6 @@ func (w *window) revealComment(cm *comment) {
 func (w *window) reviewCommentsPane(c *ui.Context, pal *palette) {
 	t := c.Theme()
 	list := w.orderedComments()
-	at := slices.IndexFunc(list, func(cm *comment) bool { return cm.storeID == w.reviewCommentID })
 	ui.Column(c).Width(300).Shrink(0).Background(pal.headerBg).BorderWidth(0, 0, 0, 1).BorderColor(pal.cardBorder).Disabled(w.loading).Children(func() {
 		ui.Row(c).Height(42).Padding(0, 10).Gap(5).BorderWidth(0, 0, 1, 0).BorderColor(pal.cardBorder).Children(func() {
 			ui.Text(c, "Comments").FontSize(13).Bold()
@@ -127,9 +117,6 @@ func (w *window) reviewCommentsPane(c *ui.Context, pal *palette) {
 			cm := list[i]
 			c.Key(cm.storeID)
 			ui.Column(c).Gap(4).FillWidth().Children(func() {
-				if cm.outdated && (i == 0 || !list[i-1].outdated) {
-					ui.Text(c, "Location changed").FontSize(11).TextColor(t.Warning).Padding(8, 6, 4)
-				}
 				button := ui.ButtonBase(c).FillWidth().Padding(8, 10).Radius(6).Label("Comment " + cm.storeID).Tooltip(cm.path + " · " + cm.label()).OnClick(func() { w.revealComment(cm) })
 				if cm.storeID == w.reviewCommentID {
 					button.Background(t.Accent.Alpha(0.1))
@@ -145,21 +132,7 @@ func (w *window) reviewCommentsPane(c *ui.Context, pal *palette) {
 				})
 			})
 		}).Grow(1).Padding(6).Label("Review comments")
-		if at >= 0 && list[at].outdated {
-			cm := list[at]
-			ui.Column(c).Padding(12).Gap(8).BorderWidth(1, 0, 0, 0).BorderColor(pal.cardBorder).Children(func() {
-				ui.Row(c).Gap(4).Children(func() {
-					ui.Text(c, "Location changed").FontSize(12).TextColor(t.Warning).Grow(1)
-					iconButton(c, iconClose, "Delete outdated comment").OnClick(func() { w.deleteComment(cm) })
-				})
-				ui.Text(c, "The original code could not be located. This comment has been kept.").FontSize(11).TextColor(t.TextMuted).FillWidth()
-				ui.TextAreaBase(c, &cm.anchor.Excerpt).Height(88).Padding(8).Font(w.codeFont()).FontSize(11).ReadOnly(true).Label("Original comment context")
-				area := ui.TextAreaBase(c, &cm.text).Height(112).Padding(8).FontSize(12).Label("Outdated review comment").OnChange(w.saveFeatureReview)
-				if area.Focused() {
-					w.typing = true
-				}
-			})
-		}
+
 	})
 }
 
@@ -167,7 +140,7 @@ func (w *window) clearReviewCommentsDialog(c *ui.Context) {
 	if !w.clearReviewCommentsOpen {
 		return
 	}
-	if choice := ui.AlertDialog(c, &w.clearReviewCommentsOpen, "Clear all comments?", "All comments in this review, including those with changed locations, will be deleted. Other reviews and viewed files will be kept.", "Cancel", "Clear all"); choice == 1 {
+	if choice := ui.AlertDialog(c, &w.clearReviewCommentsOpen, "Clear all comments?", "All comments in this review will be deleted. Other reviews and viewed files will be kept.", "Cancel", "Clear all"); choice == 1 {
 		w.clearReviewCommentsOpen = false
 		w.comments, w.discarding = nil, nil
 		w.reviewCommentID = ""

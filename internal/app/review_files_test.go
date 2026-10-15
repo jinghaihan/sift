@@ -151,7 +151,7 @@ func TestReviewFilesRestoreJSONDirectly(t *testing.T) {
 	}
 }
 
-func TestImportIntoDifferentCheckoutKeepsMissingLocations(t *testing.T) {
+func TestImportRemovesCommentsWithMissingLocations(t *testing.T) {
 	w, tt := newFeatureReview(t)
 	cm := reviewstore.NewComment("removed.go", "removed.go", "Explain this earlier decision.", reviewstore.Anchor{Side: 1, Start: 7, End: 7, Excerpt: "removedCall()"})
 	record := w.featureRecord.Clone()
@@ -165,14 +165,15 @@ func TestImportIntoDifferentCheckoutKeepsMissingLocations(t *testing.T) {
 	}
 	reviewFileDialogsForTest(t, path, "")
 	reviewMenuItem(t, tt, "Import review…")
-	if len(w.comments) != 1 || !w.comments[0].outdated || !tt.HasText("Location changed") {
-		t.Fatal("missing location was not kept for review")
+	if len(w.comments) != 0 || tt.HasText("Location changed") {
+		t.Fatal("import kept a comment whose code no longer exists")
+	}
+	_, saved, err := reviewstore.Open(filepath.Dir(cfg.path), w.featureRecord.Scope)
+	if err != nil || len(saved.Comments) != 0 {
+		t.Fatal("import cleanup was not persisted")
 	}
 	if w.featureRecord.Scope.Repository != w.repo.Root || w.featureRecord.Scope.Branch != "feature" {
 		t.Fatal("import replaced the selected local repository or branch")
-	}
-	if got := w.featureRecord.Comments[0].Anchor; got != cm.Anchor {
-		t.Fatal("import lost original context")
 	}
 }
 

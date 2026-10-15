@@ -171,7 +171,7 @@ func (w *window) restoreReviewFile(file reviewstore.ReviewFile) {
 			if list := w.orderedComments(); len(list) > 0 {
 				w.revealComment(list[0])
 			}
-			w.reviewFileNotice = "Imported " + plural(len(file.Comments), "comment")
+			w.reviewFileNotice = "Imported " + plural(len(record.Comments), "comment")
 		})
 	})
 }
