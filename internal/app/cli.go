@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -47,11 +46,20 @@ func appBundle() string {
 // cliScript is the sift command: it opens the app on the repository it
 // runs in, as codiff's terminal helper does.
 func cliScript() string {
-	if bundle := appBundle(); bundle != "" && runtime.GOOS == "darwin" {
-		return fmt.Sprintf("#!/bin/sh\n# Reviews the changes of the Git repository here with Sift.\nexec open -n -a %q --args --cwd \"$PWD\" \"$@\"\n", bundle)
-	}
 	exe, _ := os.Executable()
-	return fmt.Sprintf("#!/bin/sh\n# Reviews the changes of the Git repository here with Sift.\n%q --cwd \"$PWD\" \"$@\" >/dev/null 2>&1 &\n", exe)
+	return commandScript(exe, appBundle(), runtime.GOOS)
+}
+
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
+}
+
+func commandScript(exe, bundle, platform string) string {
+	prefix := "#!/bin/sh\ncase \"$1\" in\n  analyze|draft|validate|import|export|script|help) exec " + shellQuote(exe) + " \"$@\" ;;\nesac\n"
+	if bundle != "" && platform == "darwin" {
+		return prefix + "exec open -n -a " + shellQuote(bundle) + " --args --cwd \"$PWD\" \"$@\"\n"
+	}
+	return prefix + shellQuote(exe) + " --cwd \"$PWD\" \"$@\" >/dev/null 2>&1 &\n"
 }
 
 // installCLI writes the sift command into a directory of the PATH.

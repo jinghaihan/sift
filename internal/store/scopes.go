@@ -146,6 +146,25 @@ func LoadScope(directory, repository, branch string) (review.Scope, error) {
 	return scope, saveProjectScope(directory, session, scope)
 }
 
+// FindScope reads without migration writes, for headless analysis and dry runs.
+func FindScope(directory, repository, branch string) (review.Scope, error) {
+	session, err := readProjectSession(directory, repository)
+	if err != nil {
+		return review.Scope{}, err
+	}
+	if scope, ok := session.Scopes[branch]; ok {
+		return scope, nil
+	}
+	scope, err := legacyScope(directory)
+	if err != nil {
+		return review.Scope{}, err
+	}
+	if scope.Repository == repository && scope.Branch == branch && completeScope(scope) {
+		return scope, nil
+	}
+	return recoverScope(directory, repository, branch)
+}
+
 func recoverScope(directory, repository, branch string) (review.Scope, error) {
 	var found review.Scope
 	entries, err := os.ReadDir(filepath.Join(directory, "reviews"))

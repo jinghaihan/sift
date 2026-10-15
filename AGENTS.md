@@ -32,7 +32,9 @@ add a web frontend without a demonstrated native limitation.
 
 - `internal/review`: Git history, isolation, and review result. No UI dependency.
 - `internal/store`: local review records and Markdown export.
-- `cmd/sift/main.go`: thin executable entry point calling `app.Run`.
+- `internal/workflow`: shared analysis, draft and script operations without UI.
+- `internal/cli`: versioned headless commands and structured input/output.
+- `cmd/sift/main.go`: thin entry point dispatching headless commands or `app.Run`.
 - `internal/app`: application startup, command line handling and native views.
   Retain Godiff's file tree, continuous diff cards, inline
   comments and keyboard navigation. Do not replace these with an independent UI.

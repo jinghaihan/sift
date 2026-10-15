@@ -55,6 +55,14 @@ To continue on another computer, choose **Review files → Export review**, then
 
 Use **Export Markdown** or **Copy Markdown** to share readable notes. Markdown exports cannot be imported as reviews.
 
+## Headless commands
+
+Use `sift analyze`, `sift draft`, `sift validate`, `sift import` and `sift export`
+to work with local review data without opening a window. Ordered review scripts
+can be read, updated and exported through `sift script`; their native editor is
+not available yet. See [Headless review workflow](docs/headless.md) for the JSON
+input format, revision guards and portable review files.
+
 ## Develop
 
 ```sh
