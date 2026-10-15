@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"testing"
 
 	"github.com/egoist/mygo/ui"
@@ -34,12 +35,12 @@ func TestEmptyBranchClearsPreviousFeatureAndPreservesItsReview(t *testing.T) {
 }
 
 func TestFeatureRangeSelectsBranchesAndCommitsWithoutTypingHashes(t *testing.T) {
-	w := newWindow(&git.Repo{Root: t.TempDir()}, source{kind: sourceFeature, ref: "origin/feature/search"})
+	w := newWindow(&git.Repo{Root: filepath.Join(t.TempDir(), "example")}, source{kind: sourceFeature, ref: "origin/feature/search"})
 	w.featureBranch, w.hold = "origin/feature/search", true
 	state := &featureRangeState{branches: []string{"dev202610", "origin/dev20261113"}}
 	for i := range 400 {
 		state.commits = append(state.commits, review.Commit{
-			ID: fmt.Sprintf("%040x", i+1), Subject: fmt.Sprintf("feat: improve search %03d", i), Date: "2026-10-15",
+			ID: fmt.Sprintf("%08x%032x", 0xc31a9dc0+i, i+1), Subject: fmt.Sprintf("feat: improve search %03d", i), Date: "2026-10-15",
 		})
 	}
 	w.featureRange, w.featureNeedsScope = state, true
@@ -53,33 +54,46 @@ func TestFeatureRangeSelectsBranchesAndCommitsWithoutTypingHashes(t *testing.T) 
 	if state.integration != "origin/dev20261113" {
 		t.Fatalf("branch selection did not commit its choice: %q", state.integration)
 	}
-	list, _ := tt.Find("Feature commit choices")
-	panel, _ := tt.Find("Feature history selection")
-	if panel.X+panel.W-(list.X+list.W) != 0 {
-		t.Fatal("commit scrollbar is inset from the content edge")
+	if err := tt.Click("Choose first feature commit"); err != nil {
+		t.Fatal(err)
 	}
-	tt.Move(list.X+20, list.Y+20)
-	tt.Scroll(list.X+20, list.Y+20, 0, 20000)
+	firstChoice := state.commits[0].ShortID() + " · " + state.commits[0].Subject
+	row, ok := tt.Find(firstChoice)
+	if !ok {
+		t.Fatal("built-in combobox did not open commit choices")
+	}
+	x, y := row.X+20, row.Y+row.H/2
+	tt.Move(x, y)
+	for range 50 {
+		tt.Scroll(x, y, 0, 500)
+	}
 	last := state.commits[len(state.commits)-1]
-	lastRow, ok := tt.Find("Start at " + last.ID)
-	if !ok || lastRow.Y < list.Y || lastRow.Y+lastRow.H > list.Y+list.H {
-		t.Fatalf("last commit is not reachable: list=%+v row=%+v", list, lastRow)
+	lastChoice := last.ShortID() + " · " + last.Subject
+	lastRow, ok := tt.Find(lastChoice)
+	if !ok || lastRow.Y < 0 || lastRow.Y+lastRow.H > 860 {
+		t.Fatalf("last commit is not reachable: %+v", lastRow)
 	}
-	if err := tt.Click("Search feature commits"); err != nil {
+	tt.Key(0, ui.KeyEscape)
+	if err := tt.Click("Choose first feature commit"); err != nil {
 		t.Fatal(err)
 	}
 	tt.Type("search 007")
 	first := state.commits[7]
-	if !tt.HasText(first.Subject) || tt.HasText(last.Subject) {
+	choice := first.ShortID() + " · " + first.Subject
+	if !tt.HasText(choice) || tt.HasText(lastChoice) {
 		t.Fatal("commit search did not filter by subject")
 	}
-	if err := tt.Click("Start at " + first.ID); err != nil {
-		t.Fatal(err)
-	}
+	snapshot(t, tt, "feature-history-builtin-search")
+	tt.Key(0, ui.KeyEnter)
 	if state.start != first.ID || w.featureScope.Start != "" {
 		t.Fatal("selection should preview the range before starting review")
 	}
-	snapshot(t, tt, "feature-range-search")
+	snapshot(t, tt, "feature-history-builtin-light")
+	tt.SetDark(true)
+	tt.Frame()
+	snapshot(t, tt, "feature-history-builtin-dark")
+	tt.SetDark(false)
+	tt.Frame()
 	if err := tt.Click("Review feature"); err != nil {
 		t.Fatal(err)
 	}
@@ -92,17 +106,17 @@ func TestFeatureHistorySelectionOnlyAppearsAfterInferenceFailure(t *testing.T) {
 	w := newWindow(&git.Repo{Root: t.TempDir()}, source{kind: sourceFeature, ref: "feature"})
 	w.featureRange = &featureRangeState{loading: true}
 	tt := ui.NewTester(w.view, 1100, 760)
-	if tt.HasText("Choose feature history") {
+	if _, exists := tt.Find("Feature history selection"); exists {
 		t.Fatal("normal review offered manual history selection")
 	}
 	w.loadErr = fmt.Errorf("could not read a file")
 	tt.Frame()
-	if tt.HasText("Choose feature history") {
+	if _, exists := tt.Find("Feature history selection"); exists {
 		t.Fatal("a generic load failure offered manual history selection")
 	}
 	w.featureNeedsScope = true
 	tt.Frame()
-	if !tt.HasText("Choose feature history") {
+	if _, exists := tt.Find("Feature history selection"); !exists {
 		t.Fatal("an inference failure did not offer inline history selection")
 	}
 }
