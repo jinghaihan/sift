@@ -48,9 +48,10 @@ add a web frontend without a demonstrated native limitation.
 - English documentation, UI text and conventional commits.
 - Prefer Geist for interface text and Geist Mono for code. Match Godiff's
   compact metrics: 13-point code, 20-point line height.
-- Use MyGo's built-in styled components and default appearance throughout the UI.
-  Use `Form`, `Field`, `Combobox`, `SearchField`, and other complete widgets
-  when available; do not recreate their controls or styling with base widgets.
+- Prefer Godiff's existing UI and reusable components, including its shared
+  icon, title, and detail empty state. Where Godiff has no suitable component,
+  use MyGo's built-in styled widgets and default appearance. Only implement
+  custom components when neither provides the required behavior.
   Review existing UI changes one page at a time with screenshots.
 - Keep repository/branch selection in the header. Use icon buttons with
   tooltips for layout, wrap, comments, export and refresh. No sidebar Scope action.

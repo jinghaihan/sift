@@ -23,13 +23,13 @@ func TestConflictOnlyFeatureDoesNotLookEmpty(t *testing.T) {
 	if !tt.HasText("Review historical changes from the warning menu above.") || tt.HasText("No local changes") {
 		t.Fatal("conflict-only changes were presented as an empty feature")
 	}
-	if tt.HasText("Historical changes") || tt.HasText(w.featureResult.Uncertain[0].Subject) {
+	if !tt.HasText("Historical changes") || tt.HasText(w.featureResult.Uncertain[0].Subject) {
 		t.Fatal("the main view duplicates the warning menu's history list")
 	}
-	snapshot(t, tt, "conflict-only-feature")
+	snapshot(t, tt, "conflict-only-godiff-empty")
 	tt.SetDark(true)
 	tt.Frame()
-	snapshot(t, tt, "conflict-only-feature-dark")
+	snapshot(t, tt, "conflict-only-godiff-empty-dark")
 	tt.SetDark(false)
 	tt.Frame()
 	if err := tt.Click("3 historical conflict patches"); err != nil {
