@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"path/filepath"
@@ -17,6 +18,8 @@ import (
 )
 
 func (w *window) loadFeature() {
+	w.featureRange = nil
+	w.featureNeedsScope = false
 	w.featureHistoryOpen = false
 	w.clearReviewCommentsOpen = false
 	w.saveFeatureReview()
@@ -45,6 +48,7 @@ func (w *window) loadFeature() {
 		var record reviewstore.Record
 		var database *reviewstore.Database
 		var branches []string
+		var needsScope bool
 		var err error
 		// Finish the latest save before reopening its record on refresh or a
 		// quick source switch. Older queued saves are rejected by sequence.
@@ -66,6 +70,7 @@ func (w *window) loadFeature() {
 					scope = saved
 				} else {
 					scope, err = review.DetectScope(ctx, w.repo.Root, branch)
+					needsScope = err != nil && !errors.Is(err, review.ErrNoFeatureChanges)
 				}
 			}
 			if err == nil {
@@ -126,8 +131,22 @@ func (w *window) loadFeature() {
 				return
 			}
 			w.loading, w.loadErr, w.loadStatus = false, err, ""
+			w.featureNeedsScope = needsScope || errors.Is(err, review.ErrInvalidScope)
 			w.featureBranches, w.featureBranch = branches, branch
 			if err != nil {
+				if src.kind == sourceFeature && (w.featureNeedsScope || errors.Is(err, review.ErrNoFeatureChanges)) {
+					w.featureDB, w.featureRecord = nil, reviewstore.Record{}
+					w.comments, w.viewed = nil, nil
+					w.setFiles(nil)
+					w.buildTree()
+					w.featureResult = nil
+					if previous != nil {
+						go previous.Close()
+					}
+				}
+				if w.featureNeedsScope && src.kind == sourceFeature {
+					w.prepareFeatureHistory()
+				}
 				if result != nil && result != previous {
 					go result.Close()
 				}
@@ -326,26 +345,6 @@ func (w *window) saveFeatureReview() {
 	})
 }
 
-func (w *window) featureDialogs(c *ui.Context) {
-	if w.featureRangeOpen {
-		ui.DialogBase(c, &w.featureRangeOpen, func(backdrop, panel ui.Element) {
-			panel.Width(560).Padding(20).Gap(14).Background(paletteFor(c.Theme()).headerBg).Radius(12).Border(1, c.Theme().Border)
-			ui.Text(c, "Review range").FontSize(18).Bold()
-			ui.Text(c, "The range could not be inferred reliably. Set it once for this branch.").TextColor(c.Theme().TextMuted).FillWidth()
-			ui.Field(c, "Integration branch", func() { ui.TextInput(c, &w.featureRangeIntegration).Label("Integration branch").FillWidth() })
-			ui.Field(c, "First feature commit (inclusive)", func() { ui.TextInput(c, &w.featureRangeStart).Label("First feature commit").FillWidth() })
-			ui.Row(c).Gap(8).Children(func() {
-				ui.Button(c, "Cancel").OnClick(func() { w.featureRangeOpen = false })
-				ui.PrimaryButton(c, "Review").Disabled(w.featureRangeStart == "" || w.featureRangeIntegration == "").OnClick(func() {
-					w.featureScope = review.Scope{Repository: w.repo.Root, Branch: w.featureBranch, Integration: w.featureRangeIntegration, Start: w.featureRangeStart}
-					w.featureRangeOpen = false
-					w.load()
-				})
-			})
-		})
-	}
-}
-
 func (w *window) featureToolbar(c *ui.Context, pal *palette) {
 	t := c.Theme()
 	left, right := w.toolbarInsets(c)
@@ -379,12 +378,6 @@ func (w *window) featureToolbar(c *ui.Context, pal *palette) {
 				w.featureHistoryOpen = !w.featureHistoryOpen
 			})
 			w.featureHistoryPopover(c, trigger)
-		}
-		if w.loadErr != nil {
-			iconButton(c, iconBranch, "Set review range").OnClick(func() {
-				w.featureRangeStart, w.featureRangeIntegration = w.featureScope.Start, w.featureScope.Integration
-				w.featureRangeOpen = true
-			})
 		}
 		iconButton(c, iconSearch, "Find in diffs (⌘F)").OnClick(func() { w.finding = !w.finding })
 		wrap := iconButton(c, iconWrap, "Toggle word wrap (⌥Z)").OnClick(func() { w.settings.WordWrap = !w.settings.WordWrap; w.rowsDirty = true })

@@ -2,11 +2,15 @@ package review
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 )
+
+var ErrInvalidScope = errors.New("invalid feature history")
+var ErrNoFeatureChanges = errors.New("the branch has no commits beyond its recorded starting point")
 
 type Scope struct {
 	Repository  string `json:"repository"`
@@ -66,12 +70,12 @@ func Analyze(ctx context.Context, options Options) (Result, error) {
 	}
 	start, err := r.resolve(ctx, options.Start)
 	if err != nil {
-		return result, fmt.Errorf("select the first feature commit: %w", err)
+		return result, fmt.Errorf("%w: select the first feature commit: %v", ErrInvalidScope, err)
 	}
 	result.Start = start
 	background, err := r.resolve(ctx, options.Integration)
 	if err != nil {
-		return result, fmt.Errorf("select the integration branch: %w", err)
+		return result, fmt.Errorf("%w: select the integration branch: %v", ErrInvalidScope, err)
 	}
 	backgroundHistory, err := r.run(ctx, "rev-list", "--first-parent", background, "--")
 	if err != nil {
@@ -82,7 +86,7 @@ func Analyze(ctx context.Context, options Options) (Result, error) {
 		imported[id] = true
 	}
 	if imported[start] {
-		return result, fmt.Errorf("the integration branch's mainline already contains the first feature commit; select an integration revision before that fast-forward")
+		return result, fmt.Errorf("%w: the integration branch's mainline already contains the first feature commit; select an integration revision before that fast-forward", ErrInvalidScope)
 	}
 	history, err := History(ctx, r.path, result.Tip)
 	if err != nil {
@@ -90,10 +94,10 @@ func Analyze(ctx context.Context, options Options) (Result, error) {
 	}
 	history, err = featureHistory(history, start, imported)
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("%w: %v", ErrInvalidScope, err)
 	}
 	if len(history[len(history)-1].Parents) == 0 {
-		return result, fmt.Errorf("select a feature commit after the repository's initial commit")
+		return result, fmt.Errorf("%w: select a feature commit after the repository's initial commit", ErrInvalidScope)
 	}
 
 	temporary, err := os.MkdirTemp("", "sift-review-")

@@ -75,9 +75,9 @@ type window struct {
 	featureCancel                                           context.CancelFunc
 	featureDB                                               *reviewstore.Database
 	featureRecord                                           reviewstore.Record
-	featureRangeOpen                                        bool
+	featureNeedsScope                                       bool
 	featureHistoryOpen                                      bool
-	featureRangeStart, featureRangeIntegration              string
+	featureRange                                            *featureRangeState
 	featureClosing, featureCloseReady, featureQuitRequested bool
 	reviewCommentsOpen                                      bool
 	clearReviewCommentsOpen                                 bool

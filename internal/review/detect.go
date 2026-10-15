@@ -121,6 +121,9 @@ func DetectScope(ctx context.Context, path, branch string) (Scope, error) {
 			if !ok || !strings.HasPrefix(message, "branch: Created from ") || !background.mainline[base] {
 				continue
 			}
+			if base == tip {
+				return scope, ErrNoFeatureChanges
+			}
 			path, pathErr := featureHistory(history, base, background.mainline)
 			if pathErr != nil {
 				continue

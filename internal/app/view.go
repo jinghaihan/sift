@@ -11,6 +11,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/jinghaihan/sift/internal/git"
+	"github.com/jinghaihan/sift/internal/review"
 )
 
 func (w *window) view(c *ui.Context) {
@@ -71,7 +72,6 @@ func (w *window) view(c *ui.Context) {
 	w.sourceDialog(c)
 	w.shortcutsHelp(c)
 	w.reviewDialog(c)
-	w.featureDialogs(c)
 	w.reviewFileDialogs(c)
 	w.clearReviewCommentsDialog(c)
 	if w.discarding != nil {
@@ -298,11 +298,13 @@ func (w *window) mainArea(c *ui.Context, pal *palette) bool {
 				w.load()
 			}
 		})
+	case errors.Is(w.loadErr, review.ErrNoFeatureChanges):
+		emptyPanel(c, pal, "No feature changes", "This branch is still at its recorded starting point.", nil)
+	case w.loadErr != nil && w.featureNeedsScope && w.source.kind == sourceFeature:
+		w.featureHistoryFallback(c)
 	case w.loadErr != nil:
-		emptyPanel(c, pal, "Unable to determine review range", errorText(w.loadErr), func() {
-			if w.source.kind == sourceFeature {
-				ui.Button(c, "Choose range…").OnClick(func() { w.featureRangeOpen = true })
-			}
+		emptyPanel(c, pal, "Unable to load changes", errorText(w.loadErr), func() {
+			ui.Button(c, "Try again").OnClick(w.load)
 		})
 	case slow:
 		thinking(c, w.loadStatus)

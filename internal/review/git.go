@@ -75,6 +75,7 @@ type Commit struct {
 	ID      string
 	Parents []string
 	Subject string
+	Date    string
 }
 
 func (c Commit) ShortID() string { return c.ID[:min(9, len(c.ID))] }
@@ -88,15 +89,15 @@ func History(ctx context.Context, path, branch string) ([]Commit, error) {
 	if err != nil {
 		return nil, err
 	}
-	output, err := r.run(ctx, "log", "--topo-order", "--format=%H%x00%P%x00%s", tip, "--")
+	output, err := r.run(ctx, "log", "--topo-order", "--format=%H%x00%P%x00%s%x00%cs", tip, "--")
 	if err != nil {
 		return nil, err
 	}
 	var commits []Commit
 	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
-		fields := strings.SplitN(line, "\x00", 3)
-		if len(fields) == 3 {
-			commits = append(commits, Commit{ID: fields[0], Parents: strings.Fields(fields[1]), Subject: fields[2]})
+		fields := strings.SplitN(line, "\x00", 4)
+		if len(fields) == 4 {
+			commits = append(commits, Commit{ID: fields[0], Parents: strings.Fields(fields[1]), Subject: fields[2], Date: fields[3]})
 		}
 	}
 	return commits, nil
