@@ -23,6 +23,7 @@ func TestFeatureBranchSearchAndLongListScrolling(t *testing.T) {
 	if !ok {
 		t.Fatal("branch list did not open")
 	}
+	tt.Move(first.X+20, first.Y+10)
 	tt.Scroll(first.X+20, first.Y+10, 0, 20000)
 	snapshot(t, tt, "branch-scroll")
 	last, ok := tt.Find("feature/0399")

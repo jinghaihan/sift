@@ -99,7 +99,7 @@ class ReleaseTests(unittest.TestCase):
                 "size": 7, "signature": base64.b64encode(bytes(64)).decode(),
             }
             (directory / f"update-{target}.json").write_text(json.dumps(manifest), encoding="utf-8")
-        for name in ("Sift 0.1.0.dmg", "Sift Setup 0.1.0.exe", "sift_0.1.0_amd64.deb", "install.sh"):
+        for name in ("Sift 0.1.0.dmg", "Sift Setup 0.1.0 amd64.exe", "sift_0.1.0_amd64.deb", "install.sh"):
             (directory / name).write_bytes(b"package")
         release_assets.verify_assets(directory)
         self.assertIn("Sift 0.1.0.dmg", (directory / "SHA256SUMS").read_text(encoding="utf-8"))

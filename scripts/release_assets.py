@@ -77,7 +77,7 @@ def verify_assets(directory: Path, targets: tuple[str, ...] = TARGETS) -> None:
 
     downloads = {
         "darwin-universal": f"Sift {version}.dmg",
-        "windows-amd64": f"Sift Setup {version}.exe",
+        "windows-amd64": f"Sift Setup {version} amd64.exe",
         "linux-amd64": f"sift_{version}_amd64.deb",
     }
     for target in targets:
