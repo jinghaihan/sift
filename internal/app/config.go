@@ -51,7 +51,11 @@ func defaultSettings() Settings {
 		ReviewCommentsPrefix: "# Address these Review Comments",
 		SidebarPosition:      "left",
 		Theme:                "system",
-		FileExclusions:       []fileExclusion{{Pattern: "*.md", Enabled: true}},
+		FileExclusions: []fileExclusion{
+			{Pattern: "*.md", Enabled: true},
+			{Pattern: "*.spec.*", Enabled: true},
+			{Pattern: "*.test.*", Enabled: true},
+		},
 	}
 }
 

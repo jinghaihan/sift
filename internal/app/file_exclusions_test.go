@@ -19,6 +19,9 @@ func TestFileExclusionGlobPaths(t *testing.T) {
 		{"*.md", "README.md", true},
 		{"*.md", "docs/deep/intro.md", true},
 		{"*.md", "src/file.ts", false},
+		{"*.spec.*", "src/search.spec.ts", true},
+		{"*.test.*", "src/ui/search.test.tsx", true},
+		{"*.test.*", "src/search.ts", false},
 		{"**/*.md", "docs/guide/intro.md", true},
 		{"**/*.md", "docs/intro.mdx", false},
 		{"**/*.md", "src/md.ts", false},
@@ -50,7 +53,7 @@ func TestFileExclusionSettingsKeepDefaultsAndExplicitEmpty(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "sift.jsonc")
 	os.WriteFile(path, []byte(`{"settings":{"wordWrap":true}}`), 0o600)
 	c := &config{path: path, settings: defaultSettings()}
-	if !c.load() || len(c.Get().FileExclusions) != 1 || c.Get().FileExclusions[0].Pattern != "*.md" {
+	if !c.load() || !slices.Equal(c.Get().FileExclusions, defaultSettings().FileExclusions) {
 		t.Fatal("existing settings without rules did not get the initial default")
 	}
 	copy := c.Get()

@@ -41,7 +41,7 @@ Reviews leave the repository's current branch, working files, and index untouche
 
 ## File exclusions
 
-Use the filter button beside the file search to expand a single exclusion field. Separate patterns with commas, for example `*.md, *.map, src/generated/**`. Collapsing the field keeps the exclusions active. Changes take effect immediately and are saved automatically. Markdown files are hidden initially by `*.md`; edit or clear this pattern to include them. Patterns without `/` match file names in any directory; patterns with `/` match paths relative to the repository. Rules apply to all repositories. Clearing every rule keeps all files included after restarting.
+Use the filter button beside the file search to expand a single exclusion field. Separate patterns with commas, for example `*.md, *.map, src/generated/**`. Collapsing the field keeps the exclusions active. Changes take effect immediately and are saved automatically. The initial rules are `*.md, *.spec.*, *.test.*`, hiding Markdown and test files; edit or clear these patterns to include them. Patterns without `/` match file names in any directory; patterns with `/` match paths relative to the repository. Rules apply to all repositories. Clearing every rule keeps all files included after restarting.
 
 The filter button is highlighted while exclusions are active; hover to see the hidden-file count. Exclusions affect the file tree and displayed diff; comments are retained, and opening a comment temporarily reveals its file.
 
