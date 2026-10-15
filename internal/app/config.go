@@ -14,6 +14,7 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/jinghaihan/sift/internal/agent"
+	reviewstore "github.com/jinghaihan/sift/internal/store"
 )
 
 // Settings are the user's preferences, in ~/.sift/sift.jsonc as
@@ -110,8 +111,8 @@ type config struct {
 var cfg = newConfig()
 
 func newConfig() *config {
-	home, _ := os.UserHomeDir()
-	c := &config{path: filepath.Join(home, ".sift", "sift.jsonc"), settings: defaultSettings()}
+	directory, _ := reviewstore.DefaultDirectory()
+	c := &config{path: filepath.Join(directory, "sift.jsonc"), settings: defaultSettings()}
 	c.load()
 	return c
 }

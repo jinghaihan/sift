@@ -65,20 +65,26 @@ func NewComment(file, path, body string, anchor Anchor) Comment {
 
 type Database struct {
 	path     string
+	scope    review.Scope
 	mu       sync.Mutex
 	sequence uint64
+	base     Record
 }
 
 func DefaultDirectory() (string, error) {
-	root, err := os.UserConfigDir()
-	return filepath.Join(root, "sift"), err
+	if dir := os.Getenv("SIFT_DATA_DIR"); dir != "" {
+		return filepath.Abs(dir)
+	}
+	root, err := os.UserHomeDir()
+	return filepath.Join(root, ".sift"), err
 }
 
 func Open(directory string, scope review.Scope) (*Database, Record, error) {
 	key, _ := json.Marshal(scope)
 	path := filepath.Join(directory, "reviews", Fingerprint(string(key))[:24]+".json")
-	db := &Database{path: path}
+	db := &Database{path: path, scope: scope}
 	record := Record{Scope: scope, Viewed: map[string]string{}}
+	db.base = record.Clone()
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return db, record, nil
@@ -93,22 +99,84 @@ func Open(directory string, scope review.Scope) (*Database, Record, error) {
 		record.Viewed = map[string]string{}
 	}
 	db.sequence = record.Sequence
+	db.base = record.Clone()
 	return db, record, nil
 }
 
-// Save rejects late background writes, so a slower save cannot overwrite a
-// newer comment or a resolved thread.
+// Save merges this writer's changes under a cross-process lock. Concurrent
+// changes to the same item fail explicitly; unrelated foreign drafts survive.
 func (db *Database) Save(record Record) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	if record.Sequence < db.sequence {
 		return nil
 	}
-	if err := writeJSON(db.path, record); err != nil {
+	release, err := lockRecord(db.path)
+	if err != nil {
 		return err
 	}
-	db.sequence = record.Sequence
+	defer release()
+	data, err := os.ReadFile(db.path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	exists := err == nil
+	current := Record{Scope: db.scope, Viewed: map[string]string{}}
+	if err == nil {
+		if err = json.Unmarshal(data, &current); err != nil {
+			return err
+		}
+	}
+	merged, err := mergeRecord(db.base, record, current)
+	if err != nil {
+		return err
+	}
+	if exists && equalRecord(merged, current) {
+		db.base, db.sequence = record.Clone(), record.Sequence
+		return nil
+	}
+	merged.Sequence = max(current.Sequence+1, record.Sequence)
+	if err = writeJSON(db.path, merged); err != nil {
+		return err
+	}
+	db.base, db.sequence = record.Clone(), record.Sequence
+
 	return nil
+}
+
+var ErrConcurrentWrite = errors.New("review changed in another writer; reload before saving")
+
+// Update reads and changes the latest record under the process-wide file
+// lock. Callbacks must only change this record and must not perform Git I/O.
+func (db *Database) Update(change func(*Record) error) (Record, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	release, err := lockRecord(db.path)
+	if err != nil {
+		return Record{}, err
+	}
+	defer release()
+	data, err := os.ReadFile(db.path)
+	record := Record{}
+	if errors.Is(err, os.ErrNotExist) {
+		// Preserve the scope of a freshly opened database.
+		record.Scope = db.scope
+		record.Viewed = map[string]string{}
+	} else if err != nil {
+		return record, err
+	} else if err = json.Unmarshal(data, &record); err != nil {
+		return record, err
+	}
+	if err = change(&record); err != nil {
+		return record, err
+	}
+	record.Sequence++
+	if err = writeJSON(db.path, record); err != nil {
+		return record, err
+	}
+	db.sequence = record.Sequence
+	db.base = record.Clone()
+	return record, nil
 }
 
 func writeJSON(path string, value any) error {

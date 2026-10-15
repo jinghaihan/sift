@@ -81,6 +81,11 @@ func SaveScope(directory string, scope review.Scope) error {
 	}
 	scopeMu.Lock()
 	defer scopeMu.Unlock()
+	release, err := lockRecord(sessionPath(directory, scope.Repository))
+	if err != nil {
+		return err
+	}
+	defer release()
 	session, err := readProjectSession(directory, scope.Repository)
 	if err != nil {
 		return err
@@ -93,6 +98,11 @@ func SaveScope(directory string, scope review.Scope) error {
 func LastBranch(directory, repository string) (string, error) {
 	scopeMu.Lock()
 	defer scopeMu.Unlock()
+	release, err := lockRecord(sessionPath(directory, repository))
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	session, err := readProjectSession(directory, repository)
 	if err != nil || session.LastBranch != "" {
 		return session.LastBranch, err
@@ -111,6 +121,11 @@ func LastBranch(directory, repository string) (string, error) {
 func LoadScope(directory, repository, branch string) (review.Scope, error) {
 	scopeMu.Lock()
 	defer scopeMu.Unlock()
+	release, err := lockRecord(sessionPath(directory, repository))
+	if err != nil {
+		return review.Scope{}, err
+	}
+	defer release()
 	session, err := readProjectSession(directory, repository)
 	if err != nil {
 		return review.Scope{}, err
