@@ -49,9 +49,9 @@ The filter button is highlighted while exclusions are active; hover to see the h
 
 ## Review comments
 
-Click a code line or select a range to write a comment. Comments are saved automatically. Open the comments panel in the toolbar to browse your notes and use Previous or Next to walk through them during a review. Comments whose code can no longer be found remain available under Location changed.
+Click a code line or select a range to write a comment. Comments are saved automatically. Open the comments panel in the toolbar to browse your notes and click a note to jump to its code during a review. Comments whose code can no longer be found remain available under Location changed.
 
-To continue on another computer, choose **Review files → Export review**, then open the corresponding feature branch in the other checkout and choose **Import review**. Check the branch and version in the preview before importing. Repeated imports keep one copy of each comment; when a comment has changed, choose which copy to keep.
+To continue on another computer, save a JSON review from the export menu in the comments panel header. Open the matching repository and feature branch on the other computer, then use the import button in the same header. Select the JSON file to restore that review immediately. Imported comments and script sections replace the current review, including removing items absent from the file. Other projects and branches are unchanged. Comments are relocated by code context when the revision differs; missing locations remain available under Location changed.
 
 Use **Export Markdown** or **Copy Markdown** to share readable notes. Markdown exports cannot be imported as reviews.
 

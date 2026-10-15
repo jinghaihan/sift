@@ -73,17 +73,17 @@ func TestReviewCommentsNavigateHiddenContext(t *testing.T) {
 		t.Fatal("comment navigation left the file tree filtered out")
 	}
 	snapshot(t, tt, "review-comments")
-	if err := tt.Click("Next comment"); err != nil {
+	if err := tt.Click("Comment " + w.comments[0].storeID); err != nil {
 		t.Fatal(err)
 	}
 	if w.reviewCommentID != w.comments[0].storeID {
-		t.Fatal("next comment did not navigate")
+		t.Fatal("clicking the other comment did not navigate")
 	}
-	if err := tt.Click("Previous comment"); err != nil {
+	if err := tt.Click("Comment " + first.storeID); err != nil {
 		t.Fatal(err)
 	}
 	if w.reviewCommentID != first.storeID {
-		t.Fatal("previous comment did not navigate")
+		t.Fatal("clicking the first comment did not navigate")
 	}
 }
 

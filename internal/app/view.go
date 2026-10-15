@@ -45,7 +45,7 @@ func (w *window) view(c *ui.Context) {
 	c.Root().Background(w.sidebarBg(t))
 
 	reviewBuilt := false
-	ui.Row(c).Fill().AlignItems(ui.Stretch).Disabled(w.featureClosing).Children(func() {
+	ui.Row(c).Fill().AlignItems(ui.Stretch).Disabled(w.featureClosing || w.reviewImportReading).Children(func() {
 		right := w.settings.SidebarPosition == "right"
 		if w.sidebarShown && !right {
 			w.sidebar(c)
@@ -414,7 +414,7 @@ func thinking(c *ui.Context, status string) {
 
 // shortcuts handles the window's keys that the menus do not.
 func (w *window) shortcuts(c *ui.Context, reviewBuilt bool) {
-	if w.reviewImport != nil || w.reviewFileError != "" || w.clearReviewCommentsOpen {
+	if w.reviewImportReading || w.reviewFileError != "" || w.clearReviewCommentsOpen {
 		w.typing = false
 		return
 	}

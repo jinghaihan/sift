@@ -4,35 +4,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"github.com/jinghaihan/sift/internal/review"
 	reviewstore "github.com/jinghaihan/sift/internal/store"
 )
 
 var chooseReviewImportFile = mygo.Dialog.Open
 var chooseReviewExportFile = mygo.Dialog.Save
 
-type reviewImportConflict struct {
-	reviewstore.CommentConflict
-	choice string
-}
-
-type reviewImportState struct {
-	file      reviewstore.ReviewFile
-	remote    string
-	gen       int
-	conflicts []reviewImportConflict
-}
-
-func (w *window) reviewFilesMenu(c *ui.Context) {
+func (w *window) reviewFileActions(c *ui.Context) {
 	ready := w.isFeatureReview() && w.featureDB != nil && !w.loading && !w.featureClosing
 	hasComments := w.pendingComments() > 0
-	iconButton(c, iconOpen, "Review files…").Menu(func(m *ui.Menu) {
-		if m.Item("Import review…").Disabled(!ready || w.reviewImportReading).Chosen() {
-			w.importReviewFile()
-		}
+	iconButton(c, iconUpload, "Import review…").Disabled(!ready || w.reviewImportReading).OnClick(w.importReviewFile)
+	iconButton(c, iconShare, "Export review…").Disabled(!ready || !hasComments).Menu(func(m *ui.Menu) {
 		if m.Item("Export review…").Disabled(!ready || !hasComments).Chosen() {
 			w.exportReviewFile(false)
 		}
@@ -72,7 +60,7 @@ func (w *window) exportReviewFile(markdown bool) {
 			}
 		}
 		if err != nil {
-			w.update(func() { w.reviewFileError = "Could not export the review: " + err.Error() })
+			w.update(func() { w.reviewFileErrorTitle, w.reviewFileError = "Export failed", err.Error() })
 		}
 	})
 }
@@ -82,7 +70,7 @@ func (w *window) importReviewFile() {
 		return
 	}
 	w.reviewImportReading = true
-	parent, gen, repo := w.win, w.gen, w.repo
+	parent, gen, db := w.win, w.gen, w.featureDB
 	w.background(func() {
 		paths, err := chooseReviewImportFile(mygo.OpenDialogOptions{Parent: parent, Title: "Import review", Filters: []mygo.FileFilter{{Name: "Sift review", Extensions: []string{"json"}}}})
 		var file reviewstore.ReviewFile
@@ -94,152 +82,109 @@ func (w *window) importReviewFile() {
 				input.Close()
 			}
 		}
-		remote, _ := repo.Git("remote", "get-url", "origin")
 		w.update(func() {
-			w.reviewImportReading = false
-			if w.stale(gen) || w.featureClosing {
+			if w.stale(gen) || w.featureDB != db || w.featureClosing {
+				w.reviewImportReading = false
 				return
 			}
 			if err != nil {
-				w.reviewFileError = "Could not import the review: " + err.Error()
+				w.reviewImportReading = false
+				w.reviewFileErrorTitle, w.reviewFileError = "Import failed", err.Error()
 				return
 			}
-			if len(paths) > 0 {
-				w.prepareReviewImport(file, reviewstore.RepositoryRemote(string(remote)))
+			if len(paths) == 0 {
+				w.reviewImportReading = false
+				return
 			}
+			w.restoreReviewFile(file)
 		})
 	})
 }
 
-func (w *window) prepareReviewImport(file reviewstore.ReviewFile, remote string) {
-	state := &reviewImportState{file: file, remote: remote, gen: w.gen}
-	local := w.featureRecordSnapshot()
-	for _, conflict := range reviewstore.CommentConflicts(local.Comments, file.Comments) {
-		state.conflicts = append(state.conflicts, reviewImportConflict{CommentConflict: conflict, choice: "Keep local"})
-	}
-	w.reviewImport = state
-}
-
-func (w *window) reviewImportBlocked(state *reviewImportState) string {
-	if w.loading || w.featureClosing || state.gen != w.gen || !w.isFeatureReview() {
-		return "The current review changed. Close this dialog and import again."
-	}
+func (w *window) reviewImportBlocked(file reviewstore.ReviewFile) string {
 	branch, historical, _ := strings.Cut(w.featureRecord.Scope.Branch, "::historical:")
-	if state.file.Scope.Branch != branch {
-		return "Switch to " + state.file.Scope.Branch + " in the header, then import again."
+	if file.Scope.Branch != branch {
+		return fmt.Sprintf("Branch mismatch.\n\nJSON branch: %s\nCurrent branch: %s", file.Scope.Branch, branch)
 	}
-	if state.file.Scope.Historical != historical {
-		if state.file.Scope.Historical != "" {
-			return "Open historical patch " + shortHash(state.file.Scope.Historical) + " before importing this review."
+	if file.Scope.Historical != historical {
+		if file.Scope.Historical != "" {
+			current := "Feature review"
+			if historical != "" {
+				current = "Historical patch " + shortHash(historical)
+			}
+			return fmt.Sprintf("This JSON belongs to a different historical patch.\n\nJSON patch: %s\nCurrent view: %s", shortHash(file.Scope.Historical), current)
 		}
-		return "Return to the feature review before importing this file."
+		return "This JSON contains the feature review, but a historical patch is currently open."
 	}
 	return ""
 }
 
-func (w *window) applyReviewImport() {
-	state := w.reviewImport
-	if state == nil || w.reviewImportBlocked(state) != "" {
+func (w *window) restoreReviewFile(file reviewstore.ReviewFile) {
+	if blocked := w.reviewImportBlocked(file); blocked != "" {
+		w.reviewImportReading = false
+		w.reviewFileErrorTitle, w.reviewFileError = "Import failed", blocked
 		return
 	}
-	local := w.featureRecordSnapshot()
-	replace := map[string]bool{}
-	for _, conflict := range state.conflicts {
-		replace[conflict.Imported.ID] = conflict.choice == "Use imported"
-	}
-	local.Comments = reviewstore.MergeComments(local.Comments, state.file.Comments, replace)
-	for _, proof := range state.file.Provenance {
-		found := false
-		for _, current := range local.Provenance {
-			found = found || current.ID == proof.ID
-		}
-		if !found {
-			local.Provenance = append(local.Provenance, proof)
+	current := w.featureRecordSnapshot()
+	incoming := current.Clone()
+	incoming.Comments = slices.Clone(file.Comments)
+	incoming.Script = reviewstore.CloneScript(file.Script)
+	for _, proof := range file.Provenance {
+		if !slices.ContainsFunc(incoming.Provenance, func(p review.CommitProvenance) bool { return p.ID == proof.ID }) {
+			incoming.Provenance = append(incoming.Provenance, proof)
 		}
 	}
-	// Preserve sections from portable reviews while the script editor is being
-	// connected. Existing local sections win ID collisions, like local notes.
-	for _, section := range reviewstore.CloneScript(state.file.Script) {
-		found := false
-		for _, current := range local.Script {
-			found = found || current.ID == section.ID
-		}
-		if !found {
-			local.Script = append(local.Script, section)
-		}
-	}
-	w.featureRecord = local
-	w.comments = nil
-	w.restoreFeatureComments()
-	w.rowsDirty = true
-	w.saveFeatureReview()
-	w.reviewImport = nil
-	w.reviewCommentsOpen = true
-	if list := w.orderedComments(); len(list) > 0 {
-		w.revealComment(list[0])
-	}
+	// Relocate imported anchors against the displayed revision on the UI
+	// thread, without changing the active review before persistence succeeds.
+	candidate := &window{featureRecord: incoming, files: w.files, viewed: w.viewed}
+	candidate.restoreFeatureComments()
+	incoming = candidate.featureRecordSnapshot()
+	db, gen := w.featureDB, w.gen
+	w.background(func() {
+		record, err := db.Update(func(latest *reviewstore.Record) error {
+			if w.stale(gen) || latest.Scope != current.Scope || latest.Tip != "" && latest.Tip != current.Tip {
+				return reviewstore.ErrConcurrentWrite
+			}
+			// This is a full restore, including IDs absent from the JSON.
+			// A sequence beyond queued autosaves prevents an older snapshot
+			// from adding the replaced comments back after the import.
+			latest.Sequence = max(latest.Sequence, current.Sequence)
+			latest.Tip = current.Tip
+			latest.Comments = incoming.Comments
+			latest.Script = incoming.Script
+			latest.Provenance = incoming.Provenance
+			return nil
+		})
+		w.update(func() {
+			w.reviewImportReading = false
+			if w.stale(gen) || w.featureDB != db || w.featureClosing {
+				return
+			}
+			if err != nil {
+				w.reviewFileErrorTitle, w.reviewFileError = "Import failed", err.Error()
+				return
+			}
+			w.featureRecord = record
+			w.comments, w.discarding = candidate.comments, nil
+			w.reviewCommentID = ""
+			w.rowsDirty, w.reviewCommentsOpen = true, true
+			if list := w.orderedComments(); len(list) > 0 {
+				w.revealComment(list[0])
+			}
+			w.reviewFileNotice = "Imported " + plural(len(file.Comments), "comment")
+		})
+	})
 }
 
 func (w *window) reviewFileDialogs(c *ui.Context) {
+	if w.reviewFileNotice != "" {
+		c.Toast(w.reviewFileNotice)
+		w.reviewFileNotice = ""
+	}
 	if w.reviewFileError != "" {
 		open := true
-		if ui.AlertDialog(c, &open, "Review file error", w.reviewFileError, "OK") >= 0 || !open {
+		if ui.AlertDialog(c, &open, w.reviewFileErrorTitle, w.reviewFileError, "OK") >= 0 || !open {
 			w.reviewFileError = ""
 		}
-	}
-	state := w.reviewImport
-	if state == nil {
-		return
-	}
-	open := true
-	ui.DialogBase(c, &open, func(backdrop, panel ui.Element) {
-		t := c.Theme()
-		width, height := c.Size()
-		panel.Width(min(560, width-32)).MaxHeight(min(680, height-32)).Padding(18).Gap(10).Radius(10).Border(1, t.Border).Background(paletteFor(t).headerBg)
-		ui.Row(c).Gap(8).Children(func() {
-			ui.Text(c, "Import review").FontSize(17).Bold().Grow(1)
-			iconButton(c, iconClose, "Close import").OnClick(func() { w.reviewImport = nil })
-		})
-		ui.Text(c, "Import into "+filepath.Base(w.repo.Root)).FontSize(12).FontWeight(600)
-		ui.Text(c, "Branch: "+state.file.Scope.Branch).FontSize(12).SingleLine().FillWidth()
-		ui.Text(c, fmt.Sprintf("Comments: %d", len(state.file.Comments))).FontSize(12)
-		ui.Text(c, "Revision: "+shortHash(state.file.Revision)).Font(w.codeFont()).FontSize(12)
-		if state.file.Repository.Remote != "" && state.remote != "" && state.file.Repository.Remote != state.remote {
-			ui.Text(c, "The repository origin differs. Check that the selected repository is correct.").FontSize(12).TextColor(t.Warning).FillWidth()
-		} else if state.file.Repository.Name != filepath.Base(w.repo.Root) {
-			ui.Text(c, "Exported from "+state.file.Repository.Name+". Its local directory may have a different name.").FontSize(11).TextColor(t.TextMuted).FillWidth()
-		}
-		blocked := w.reviewImportBlocked(state)
-		if blocked != "" {
-			ui.Text(c, blocked).FontSize(12).TextColor(t.Warning).FillWidth()
-		} else if state.file.Revision != w.featureRecord.Tip || state.file.Scope.Start != w.featureRecord.Scope.Start || state.file.Scope.Integration != w.featureRecord.Scope.Integration {
-			ui.Text(c, "Version differs. Comments will be relocated by code context; missing locations will be kept separately.").FontSize(12).TextColor(t.Warning).FillWidth()
-		} else {
-			ui.Text(c, "Version matches the current review.").FontSize(12).TextColor(t.TextMuted)
-		}
-		if len(state.conflicts) > 0 {
-			ui.Text(c, fmt.Sprintf("%d comments have changes. Choose which copy to keep.", len(state.conflicts))).FontSize(12).FillWidth()
-			ui.Scroll(c).MaxHeight(260).FillWidth().Children(func() {
-				ui.Column(c).Gap(12).FillWidth().Children(func() {
-					for i := range state.conflicts {
-						conflict := &state.conflicts[i]
-						c.Key(conflict.Imported.ID)
-						ui.Column(c).Gap(5).FillWidth().Padding(10).Border(1, t.Border).Radius(6).Children(func() {
-							ui.Text(c, conflict.Local.Path).FontSize(12).Bold().SingleLine().FillWidth()
-							ui.Text(c, "Local: "+conflict.Local.Body).FontSize(12).FillWidth().Selectable()
-							ui.Text(c, "Imported: "+conflict.Imported.Body).FontSize(12).FillWidth().Selectable()
-							ui.Select(c, &conflict.choice, []string{"Keep local", "Use imported"}).Label("Conflict " + conflict.Imported.ID)
-						})
-					}
-				})
-			})
-		}
-		ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
-			ui.Button(c, "Cancel").OnClick(func() { w.reviewImport = nil })
-			ui.PrimaryButton(c, "Import").Disabled(blocked != "").OnClick(w.applyReviewImport)
-		})
-	})
-	if !open {
-		w.reviewImport = nil
 	}
 }

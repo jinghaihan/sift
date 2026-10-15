@@ -55,20 +55,6 @@ func (w *window) toggleReviewComments() {
 	w.revealComment(list[at])
 }
 
-func (w *window) stepReviewComment(direction int) {
-	list := w.orderedComments()
-	if len(list) == 0 {
-		return
-	}
-	at := slices.IndexFunc(list, func(cm *comment) bool { return cm.storeID == w.reviewCommentID })
-	if at < 0 {
-		at = 0
-	} else {
-		at = max(0, min(at+direction, len(list)-1))
-	}
-	w.revealComment(list[at])
-}
-
 func (w *window) revealComment(cm *comment) {
 	w.reviewCommentID = cm.storeID
 	list := w.orderedComments()
@@ -130,10 +116,8 @@ func (w *window) reviewCommentsPane(c *ui.Context, pal *palette) {
 		ui.Row(c).Height(42).Padding(0, 10).Gap(5).BorderWidth(0, 0, 1, 0).BorderColor(pal.cardBorder).Children(func() {
 			ui.Text(c, "Comments").FontSize(13).Bold()
 			ui.Text(c, fmt.Sprint(len(list))).FontSize(11).TextColor(t.TextMuted).Grow(1)
-			iconButton(c, iconArrowUp, "Previous comment").Disabled(at <= 0).OnClick(func() { w.stepReviewComment(-1) })
-			iconButton(c, iconArrowDown, "Next comment").Disabled(len(list) == 0 || at == len(list)-1).OnClick(func() { w.stepReviewComment(1) })
+			w.reviewFileActions(c)
 			iconButton(c, iconTrash, "Clear all comments").Disabled(len(w.comments) == 0).OnClick(func() { w.clearReviewCommentsOpen = true })
-			iconButton(c, iconClose, "Close comments").OnClick(func() { w.reviewCommentsOpen = false })
 		})
 		if len(list) == 0 {
 			ui.Text(c, "Click a code line to write a comment. Your comments are saved automatically.").FontSize(12).TextColor(t.TextMuted).Padding(16).FillWidth()

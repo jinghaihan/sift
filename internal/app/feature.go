@@ -399,7 +399,6 @@ func (w *window) featureToolbar(c *ui.Context, pal *palette) {
 		if w.reviewCommentsOpen {
 			comments.Background(pal.hover).TextColor(t.Text)
 		}
-		w.reviewFilesMenu(c)
 		if w.loading {
 			iconButton(c, iconStop, "Cancel analysis").OnClick(func() {
 				if w.featureCancel != nil {

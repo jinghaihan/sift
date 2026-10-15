@@ -66,8 +66,9 @@ type window struct {
 	historicalList                                          ui.ListState
 	historicalRow                                           int
 	historicalPointer                                       [2]float32
-	reviewImport                                            *reviewImportState
 	reviewImportReading                                     bool
+	reviewFileNotice                                        string
+	reviewFileErrorTitle                                    string
 	reviewFileError                                         string
 	featureBranches                                         []string
 	featureBranch                                           string

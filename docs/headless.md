@@ -96,5 +96,8 @@ Import rejects conflicting content by default. Select `--on-conflict keep-local`
 or `--on-conflict incoming` explicitly. `--allow-stale` retains unresolved or
 stale imported references for repair. Use the app's historical view to import a
 historical comment bundle. Data and export destinations must be outside the
-reviewed repository. Native review imports keep existing local script sections
-when IDs collide.
+reviewed repository.
+
+The app restores a selected JSON file directly, replacing the current review's
+comments and script sections with its contents. CLI conflict options apply only
+to headless imports.
