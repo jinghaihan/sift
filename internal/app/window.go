@@ -60,6 +60,9 @@ type window struct {
 	branchQuery                                             string
 	branchQueryFor                                          string
 	branchHighlight                                         string
+	branchPickerOpen                                        bool
+	branchRefreshGen                                        uint64
+	branchRefreshErr                                        error
 	historicalQuery                                         string
 	historicalList                                          ui.ListState
 	reviewImport                                            *reviewImportState

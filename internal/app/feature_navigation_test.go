@@ -2,12 +2,39 @@ package app
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/jinghaihan/sift/internal/git"
 	"github.com/jinghaihan/sift/internal/review"
 )
+
+func TestFeatureBranchPickerReloadsRefsOnEachOpen(t *testing.T) {
+	w, tt := newFeatureReview(t)
+	gitIn(t, w.repo.Root, "branch", "new-feature")
+	if err := tt.Click("Feature branch"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if !slices.Contains(w.featureBranches, "new-feature") {
+		t.Fatal("opening the branch picker did not read a newly created branch")
+	}
+	tt.Key(0, ui.KeyEscape)
+	gitIn(t, w.repo.Root, "branch", "-D", "new-feature")
+	gitIn(t, w.repo.Root, "update-ref", "refs/remotes/origin/another", "HEAD")
+	if err := tt.Click("Feature branch"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if slices.Contains(w.featureBranches, "new-feature") || !slices.Contains(w.featureBranches, "origin/another") {
+		t.Fatal("reopening the picker did not update local and remote choices")
+	}
+	if w.featureBranch != "feature" || strings.TrimSpace(gitIn(t, w.repo.Root, "branch", "--show-current")) != "feature" {
+		t.Fatal("refreshing choices changed the reviewed or checked-out branch")
+	}
+}
 
 func TestFeatureBranchSearchAndLongListScrolling(t *testing.T) {
 	w := newWindow(&git.Repo{Root: t.TempDir()}, source{kind: sourceFeature, ref: "feature"})
@@ -19,6 +46,7 @@ func TestFeatureBranchSearchAndLongListScrolling(t *testing.T) {
 	if err := tt.Click("Feature branch"); err != nil {
 		t.Fatal(err)
 	}
+	queued := len(w.held)
 	first, ok := tt.Find("feature/0000")
 	if !ok {
 		t.Fatal("branch list did not open")
@@ -30,18 +58,18 @@ func TestFeatureBranchSearchAndLongListScrolling(t *testing.T) {
 	if !ok || last.Y < 52 || last.Y+last.H > 400 {
 		t.Fatalf("last branch is not reachable inside a bounded popup: first=%+v last=%+v", first, last)
 	}
-	if w.featureBranch != "feature" || len(w.held) != 0 {
+	if w.featureBranch != "feature" || len(w.held) != queued {
 		t.Fatal("scrolling changed the branch")
 	}
 	// Typing filters the choices without starting a review until selection.
 	tt.Command("selectAll")
 	tt.Type("0399")
-	if w.featureBranch != "feature" || len(w.held) != 0 || !tt.HasText("feature/0399") {
+	if w.featureBranch != "feature" || len(w.held) != queued || !tt.HasText("feature/0399") {
 		t.Fatal("branch search changed the review before confirmation")
 	}
 	snapshot(t, tt, "branch-search")
 	tt.Key(0, ui.KeyEnter)
-	if w.source.ref != "feature/0399" || len(w.held) == 0 {
+	if w.source.ref != "feature/0399" || len(w.held) != queued+1 {
 		t.Fatal("Enter did not select the matching branch")
 	}
 }

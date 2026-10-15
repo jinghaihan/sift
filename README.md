@@ -33,7 +33,7 @@ To open a particular feature branch:
 go run ./cmd/sift --branch feature/my-change /path/to/repository
 ```
 
-The branch picker includes local and fetched remote-tracking branches, such as `origin/feature/my-change`. Fetch in your Git client to update the remote records before reviewing.
+The branch picker includes local and fetched remote-tracking branches, such as `origin/feature/my-change`, and reloads its choices each time you open it. Fetch in your Git client to update the remote records before reviewing.
 
 When Git history does not identify the range reliably, Sift asks for the integration branch and first feature commit. The first commit is included in the review, and the range is remembered for that branch.
 

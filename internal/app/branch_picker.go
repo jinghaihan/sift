@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"strings"
 
 	"github.com/egoist/mygo/ui"
@@ -19,10 +20,17 @@ func (w *window) featureBranchPicker(c *ui.Context, pal *palette) {
 		input.BorderColor(t.Accent)
 		w.typing = true
 	}
+	if parts.Open() && !w.branchPickerOpen {
+		w.refreshFeatureBranches()
+	}
+	w.branchPickerOpen = parts.Open()
 	parts.Popup(func(panel ui.Element) {
 		panel.Width(280).Radius(8).Background(pal.headerBg).Border(1, t.Border).Shadow(0, 4, 12, 0, ui.RGBA(0, 0, 0, 0.15))
 		ui.Scroll(c).MaxHeight(288).FillWidth().Children(func() {
 			ui.Column(c).FillWidth().Padding(4).Children(func() {
+				if w.branchRefreshErr != nil {
+					ui.Text(c, "Could not refresh branches").FontSize(12).TextColor(t.Warning).Tooltip(errorText(w.branchRefreshErr)).Padding(8)
+				}
 				query := strings.ToLower(strings.TrimSpace(w.branchQuery))
 				count := 0
 				for _, branch := range w.featureBranches {
@@ -59,4 +67,21 @@ func (w *window) featureBranchPicker(c *ui.Context, pal *palette) {
 	if !parts.Open() {
 		w.branchQuery, w.branchHighlight = w.featureBranch, ""
 	}
+}
+
+func (w *window) refreshFeatureBranches() {
+	w.branchRefreshGen++
+	request, gen, path := w.branchRefreshGen, w.gen, w.repo.Root
+	w.background(func() {
+		info, err := review.Inspect(context.Background(), path)
+		w.update(func() {
+			if w.branchRefreshGen != request || w.repo.Root != path || w.gen != gen {
+				return
+			}
+			w.branchRefreshErr = err
+			if err == nil {
+				w.featureBranches = info.Branches
+			}
+		})
+	})
 }
