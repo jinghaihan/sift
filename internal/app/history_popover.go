@@ -18,7 +18,6 @@ func (w *window) featureHistoryPopover(c *ui.Context, trigger ui.Element) {
 			ui.Text(c, "Historical changes").FontSize(13).Bold().Grow(1)
 			iconButton(c, iconClose, "Close historical changes").OnClick(func() { w.featureHistoryOpen = false })
 		})
-		ui.Text(c, "Historical patches, separate from the final feature changes.").FontSize(11).TextColor(t.TextMuted).FillWidth()
 		search := ui.SearchField(c, &w.historicalQuery).Label("Search historical changes").FillWidth()
 		if search.FocusWithin() {
 			w.typing = true
