@@ -56,12 +56,19 @@ func Inspect(ctx context.Context, path string) (Repository, error) {
 	if err != nil {
 		return Repository{}, err
 	}
-	branches, err := r.run(ctx, "for-each-ref", "--format=%(refname:short)", "refs/heads/")
+	refs, err := r.run(ctx, "for-each-ref", "--format=%(refname:short)%00%(symref)", "refs/heads/", "refs/remotes/")
 	if err != nil {
 		return Repository{}, err
 	}
 	branch, _ := r.run(ctx, "symbolic-ref", "--quiet", "--short", "HEAD")
-	return Repository{Path: r.path, Branch: strings.TrimSpace(branch), Branches: strings.Fields(branches)}, nil
+	var branches []string
+	for line := range strings.SplitSeq(strings.TrimSpace(refs), "\n") {
+		name, symbolic, ok := strings.Cut(line, "\x00")
+		if ok && symbolic == "" {
+			branches = append(branches, name)
+		}
+	}
+	return Repository{Path: r.path, Branch: strings.TrimSpace(branch), Branches: branches}, nil
 }
 
 type Commit struct {
